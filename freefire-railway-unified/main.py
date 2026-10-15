@@ -1,7 +1,6 @@
 """
-Unified Free Fire Matchmaking Bot & Dashboard Server
-Optimized for Railway deployment (reads $PORT, /health check, background workers)
-Unifies newbrsup/lc.py and UDP_LEAKED_BY_SAITO/main.py (parts 1-5)
+Free Fire Matchmaking Web Dashboard & Multi-Account Parallel Worker
+Dual-compatible with AI Studio Preview (Port 3000) and Railway Ingress ($PORT)
 """
 
 import os
@@ -9,24 +8,19 @@ import sys
 import json
 import time
 import logging
-import threading
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, request, render_template, Response
 
-# Import core engine and opcodes
 from engine import FFMatchmakingEngine
 from message_ids import Opcodes
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("FF-Railway-Server")
 
-# Base directory of the project
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Initialize Flask App with absolute template folder
 app = Flask(
     __name__,
     template_folder=os.path.join(BASE_DIR, "templates"),
@@ -34,143 +28,108 @@ app = Flask(
 )
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "ff-secret-railway-key-2026")
 
-# Global engine instance with absolute file paths
+# Initialize Engine with absolute paths
 engine = FFMatchmakingEngine(
     accounts_file=os.path.join(BASE_DIR, "accounts.json"),
     devices_file=os.path.join(BASE_DIR, "devices.json"),
-    users_file=os.path.join(BASE_DIR, "users.json"),
     cache_file=os.path.join(BASE_DIR, "token_cache.json")
 )
 
-# Background worker thread controller
-engine_thread = None
-is_running = False
-
-def background_worker():
-    global is_running
-    logger.info("Background matchmaking worker started.")
-    while is_running:
-        try:
-            engine.process_tick()
-            time.sleep(1.0)
-        except Exception as e:
-            logger.error(f"Error in engine tick: {e}", exc_info=True)
-            time.sleep(5.0)
-    logger.info("Background matchmaking worker stopped.")
-
 @app.route("/")
 def index():
-    """Serve the interactive web dashboard interface"""
     if request.headers.get("Accept") == "application/json" or request.args.get("format") == "json":
-        return api_info()
+        return jsonify(engine.get_stats())
     try:
         return render_template("index.html")
     except Exception as e:
-        logger.warning(f"Could not render template: {e}")
-        return api_info()
-
-@app.route("/api/info")
-def api_info():
-    """Serve the raw JSON system metadata"""
-    return jsonify({
-        "status": "online",
-        "service": "Railway FreeFire Matchmaking Studio",
-        "version": "2.4.0-unified",
-        "port": os.getenv("PORT", "5000"),
-        "engine_active": is_running,
-        "accounts_loaded": len(engine.accounts),
-        "devices_configured": len(engine.devices),
-        "endpoints": {
-            "health": "/health",
-            "status": "/api/status",
-            "start_match": "/api/match/start",
-            "cancel_match": "/api/match/cancel",
-            "accounts": "/api/accounts",
-            "devices": "/api/devices",
-            "logs": "/api/logs"
-        }
-    })
+        logger.error(f"Template rendering failed: {e}")
+        return jsonify(engine.get_stats())
 
 @app.route("/health")
 def health():
-    """Railway health check probe endpoint"""
     return jsonify({
         "status": "healthy",
         "timestamp": int(time.time()),
-        "uptime_seconds": int(time.time() - engine.start_time)
+        "uptime": int(time.time() - engine.start_time)
     }), 200
 
 @app.route("/api/status")
 def api_status():
-    """Returns engine state, active matchmaking queue, and recent events"""
-    return jsonify(engine.get_status())
+    return jsonify(engine.get_stats())
 
-@app.route("/api/match/start", methods=["POST"])
-def api_start_match():
-    """Trigger StartMatch packet request for loaded account/squad"""
+@app.route("/api/worker/start", methods=["POST"])
+def api_worker_start():
     data = request.get_json() or {}
     account_id = data.get("account_id")
-    mode = data.get("mode", 2) # Ranked
-    team_type = data.get("team_type", 1) # Solo=1, Duo=2, Squad=4
-    region = data.get("region", "IND")
-    
-    result = engine.start_match(account_id=account_id, mode=mode, team_type=team_type, region=region)
+    if not account_id or account_id == "ALL":
+        result = engine.start_all()
+    else:
+        result = engine.start_worker(account_id)
     return jsonify(result)
 
-@app.route("/api/match/cancel", methods=["POST"])
-def api_cancel_match():
-    """Cancel active matchmaking queue"""
-    result = engine.cancel_match()
+@app.route("/api/worker/stop", methods=["POST"])
+def api_worker_stop():
+    data = request.get_json() or {}
+    account_id = data.get("account_id")
+    if not account_id or account_id == "ALL":
+        result = engine.stop_all()
+    else:
+        result = engine.stop_worker(account_id)
     return jsonify(result)
 
-@app.route("/api/accounts", methods=["GET", "POST"])
+@app.route("/api/accounts", methods=["GET"])
 def api_accounts():
-    """View or update bot accounts"""
-    if request.method == "POST":
-        new_accounts = request.get_json()
-        engine.update_accounts(new_accounts)
-        return jsonify({"status": "success", "count": len(new_accounts)})
-    return jsonify(engine.accounts)
+    stats = engine.get_stats()
+    return jsonify(stats.get("accounts", []))
 
-@app.route("/api/devices", methods=["GET"])
-def api_devices():
-    """View configured device hardware fingerprints"""
-    return jsonify(engine.devices)
+@app.route("/api/accounts/add", methods=["POST"])
+def api_accounts_add():
+    data = request.get_json() or {}
+    result = engine.add_account(data)
+    return jsonify(result)
 
-@app.route("/api/logs", methods=["GET"])
+@app.route("/api/accounts/delete/<account_id>", methods=["DELETE", "POST"])
+def api_accounts_delete(account_id):
+    result = engine.delete_account(account_id)
+    return jsonify(result)
+
+@app.route("/api/accounts/export/json")
+def api_export_json():
+    content = engine.export_accounts_json()
+    return Response(
+        content,
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment;filename=accounts.json"}
+    )
+
+@app.route("/api/accounts/export/js")
+def api_export_js():
+    content = engine.export_accounts_js()
+    return Response(
+        content,
+        mimetype="application/javascript",
+        headers={"Content-Disposition": "attachment;filename=accounts.js"}
+    )
+
+@app.route("/api/logs")
 def api_logs():
-    """Get recent network logs and packet events"""
-    limit = int(request.args.get("limit", 50))
-    return jsonify(engine.get_logs(limit))
-
-@app.route("/api/engine/start", methods=["POST"])
-def api_engine_start():
-    """Start background matchmaking daemon"""
-    global is_running, engine_thread
-    if not is_running:
-        is_running = True
-        engine_thread = threading.Thread(target=background_worker, daemon=True)
-        engine_thread.start()
-        return jsonify({"status": "started", "active": True})
-    return jsonify({"status": "already_running", "active": True})
-
-@app.route("/api/engine/stop", methods=["POST"])
-def api_engine_stop():
-    """Stop background matchmaking daemon"""
-    global is_running
-    is_running = False
-    return jsonify({"status": "stopping", "active": False})
+    account_id = request.args.get("account_id")
+    limit = int(request.args.get("limit", 100))
+    return jsonify(engine.get_logs(account_id=account_id, limit=limit))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_ID"):
+        port = int(os.environ.get("PORT", 5000))
+    else:
+        port = 3000
     host = os.environ.get("HOST", "0.0.0.0")
-    auto_start = os.environ.get("AUTO_START", "true").lower() == "true"
     
-    if auto_start:
-        is_running = True
-        engine_thread = threading.Thread(target=background_worker, daemon=True)
-        engine_thread.start()
-        logger.info("Auto-start enabled: Background engine thread spawned.")
-        
-    logger.info(f"Starting server on {host}:{port} for Railway environment...")
+    # Only start workers if explicitly requested via AUTO_START=true or via Web Dashboard buttons
+    if os.environ.get("AUTO_START", "false").lower() == "true":
+        logger.info("AUTO_START is enabled: Launching all account workers in parallel...")
+        engine.start_all()
+    else:
+        logger.info("Engine initialized in standby mode. Workers ready to be started via Web Dashboard.")
+
+    logger.info(f"Free Fire Matchmaking Studio listening on {host}:{port}")
     app.run(host=host, port=port, debug=False)
