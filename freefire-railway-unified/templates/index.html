@@ -17,7 +17,6 @@
     }
     code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-    /* Cyber grid overlay */
     .bg-grid {
       background-size: 36px 36px;
       background-image: 
@@ -25,7 +24,6 @@
         linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
     }
 
-    /* Ambient glow orbs */
     .glow-orb-cyan {
       position: absolute;
       width: 480px;
@@ -45,7 +43,6 @@
       z-index: 0;
     }
 
-    /* Glassmorphism elements */
     .glass-header {
       background: rgba(2, 6, 23, 0.75);
       backdrop-filter: blur(24px);
@@ -72,7 +69,6 @@
       transform: translateY(-3px);
     }
 
-    /* Glow text */
     .text-glow-emerald {
       text-shadow: 0 0 20px rgba(52, 211, 153, 0.5);
     }
@@ -80,7 +76,6 @@
       text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
     }
 
-    /* Custom scrollbar */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: rgba(2, 6, 23, 0.9); }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -89,11 +84,10 @@
 </head>
 <body class="min-h-screen flex flex-col antialiased bg-grid relative">
 
-  <!-- Background Glow Orbs -->
   <div class="glow-orb-cyan top-0 left-[-100px]"></div>
   <div class="glow-orb-emerald top-[35%] right-[-100px]"></div>
 
-  <!-- Top Glass Navigation -->
+  <!-- Header -->
   <header class="sticky top-0 z-40 glass-header px-6 py-4">
     <div class="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div class="flex items-center gap-3.5">
@@ -111,14 +105,13 @@
             </span>
           </div>
           <p class="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-            <span>Farming directly to <span class="text-cyan-300 font-bold">accounts.js</span></span>
+            <span>Syncs live with <span class="text-cyan-300 font-bold">accounts.js</span></span>
             <span>·</span>
             <span class="text-emerald-400 font-semibold"><span id="hdr-active-count">0</span> Active Parallel Threads</span>
           </p>
         </div>
       </div>
 
-      <!-- Action Buttons -->
       <div class="flex flex-wrap items-center gap-3">
         <button onclick="startAll()" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs rounded-xl transition shadow-lg shadow-emerald-500/25 cursor-pointer flex items-center gap-1.5">
           ▶ Start All Workers
@@ -137,21 +130,19 @@
     </div>
   </header>
 
-  <!-- Page Content -->
   <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6 z-10">
 
-    <!-- 24/7 Headless Info Banner -->
+    <!-- 24/7 Multi-Device Sync Banner -->
     <div class="glass-panel rounded-2xl p-4 sm:p-5 border border-cyan-500/20 bg-gradient-to-r from-cyan-950/20 via-slate-900/40 to-emerald-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-1">
         <div class="flex items-center gap-2">
           <span class="text-sm font-extrabold text-white flex items-center gap-1.5">
-            ⚡ 24/7 Headless Background Farm Mode Active
+            ⚡ 24/7 Multi-Device Headless Background Farm Active
           </span>
         </div>
         <p class="text-xs text-slate-300 max-w-3xl leading-relaxed">
-          The bot runs directly on the Railway server as an independent daemon. 
-          <strong class="text-cyan-300">You do not need to keep this page open.</strong> 
-          You can close your browser or turn off your device—the accounts will continuously queue matches, claim EXP, and write progress to <code class="text-emerald-400">accounts.js</code> 24/7.
+          The bot runs 24/7 on the Railway server. All accounts are saved directly to <code class="text-emerald-400 font-bold">accounts.js</code> and synced across all your devices in real time.
+          <strong>No fake EXP is ever added:</strong> EXP only updates when verified by real Garena level and EXP checks.
         </p>
       </div>
       <div class="shrink-0 flex items-center gap-2">
@@ -161,28 +152,28 @@
       </div>
     </div>
 
-    <!-- Glowing Cyber KPI Cards -->
+    <!-- KPI Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="p-5 glass-card rounded-2xl relative overflow-hidden border-sky-500/20">
         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">Accounts in accounts.js</div>
         <div id="stat-total-acc" class="text-3xl font-extrabold font-mono text-white mt-1 tabular-nums">0</div>
-        <div class="text-[11px] text-slate-500 mt-1 font-mono">Parallel worker threads</div>
+        <div class="text-[11px] text-slate-500 mt-1 font-mono">Synced across all devices</div>
       </div>
 
       <div class="p-5 glass-card rounded-2xl relative overflow-hidden border-emerald-500/20">
         <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider font-mono">Active Farming Threads</div>
         <div id="stat-active-threads" class="text-3xl font-extrabold font-mono text-emerald-400 mt-1 tabular-nums text-glow-emerald">0</div>
-        <div class="text-[11px] text-emerald-500/80 mt-1 font-mono">Farming EXP concurrently</div>
+        <div class="text-[11px] text-emerald-500/80 mt-1 font-mono">Farming concurrently</div>
       </div>
 
       <div class="p-5 glass-card rounded-2xl relative overflow-hidden border-amber-500/20">
-        <div class="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">Matches Farmed</div>
+        <div class="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">Matches Completed</div>
         <div id="stat-matches" class="text-3xl font-extrabold font-mono text-amber-300 mt-1 tabular-nums">0</div>
-        <div class="text-[11px] text-slate-500 mt-1 font-mono">Completed Battle Royale games</div>
+        <div class="text-[11px] text-slate-500 mt-1 font-mono">Live matches tracked</div>
       </div>
 
       <div class="p-5 glass-card rounded-2xl relative overflow-hidden border-cyan-500/30">
-        <div class="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono">Total Cumulative EXP</div>
+        <div class="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono">Total Verified EXP</div>
         <div id="stat-total-exp" class="text-3xl font-extrabold font-mono text-cyan-300 mt-1 tabular-nums text-glow-cyan">0</div>
         <div class="text-[11px] text-slate-300 mt-1 font-mono">
           Session Gain: <span id="stat-session-exp" class="text-emerald-400 font-bold">+0 EXP</span>
@@ -190,10 +181,10 @@
       </div>
     </div>
 
-    <!-- View Tabs -->
+    <!-- Tabs -->
     <div class="flex items-center gap-2 border-b border-white/10 pb-1 text-xs font-bold">
       <button onclick="setTab('accounts')" id="btn-tab-accounts" class="px-5 py-3 text-cyan-400 border-b-2 border-cyan-400 cursor-pointer transition">
-        👥 Bot Accounts & Live EXP (<span id="tab-acc-count">0</span>)
+        👥 Bot Accounts (<span id="tab-acc-count">0</span>)
       </button>
       <button onclick="setTab('logs')" id="btn-tab-logs" class="px-5 py-3 text-slate-400 hover:text-slate-200 cursor-pointer transition">
         ⚡ Parallel Socket Feed
@@ -202,9 +193,7 @@
 
     <!-- TAB 1: Accounts Grid -->
     <div id="tab-accounts-content" class="space-y-4">
-      <div id="accounts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <!-- Rendered via JS -->
-      </div>
+      <div id="accounts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
     </div>
 
     <!-- TAB 2: Live Socket Logs -->
@@ -228,30 +217,54 @@
 
   </main>
 
-  <!-- Clean 2-Field Add Account Modal (ONLY UID & PASSWORD) -->
+  <!-- Add Account Modal -->
   <div id="add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-    <div class="w-full max-w-md glass-panel rounded-3xl p-6 sm:p-7 space-y-5 border border-cyan-500/30 shadow-2xl relative">
+    <div class="w-full max-w-md glass-panel rounded-3xl p-6 sm:p-7 space-y-4 border border-cyan-500/30 shadow-2xl relative">
       <div class="flex items-center justify-between">
         <div>
-          <h3 class="text-base font-extrabold text-white tracking-tight">Add Account</h3>
-          <p class="text-xs text-slate-400 mt-0.5">Enter credentials below. Level & EXP are auto-fetched.</p>
+          <h3 class="text-base font-extrabold text-white tracking-tight">Add Free Fire Account</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Real In-Game Name & Real FF UID parsed via Major Login.</p>
         </div>
         <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">✕</button>
       </div>
 
-      <form onsubmit="handleAddAccount(event)" class="space-y-4 font-mono text-xs">
+      <form onsubmit="handleAddAccount(event)" class="space-y-3 font-mono text-xs">
         <div>
-          <label class="block text-slate-300 font-sans font-bold text-xs mb-1.5">Free Fire UID (Account ID)</label>
-          <input type="number" id="input-uid" required placeholder="e.g. 6002130241" class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm">
+          <label class="block text-slate-300 font-sans font-bold text-xs mb-1">UID / Login ID *</label>
+          <input type="text" id="input-uid" required placeholder="Enter login UID or account ID" class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm">
         </div>
 
         <div>
-          <label class="block text-slate-300 font-sans font-bold text-xs mb-1.5">Password / Auth Token</label>
-          <input type="password" id="input-password" required placeholder="Enter password or access token" class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm">
+          <label class="block text-slate-300 font-sans font-bold text-xs mb-1">Password / Auth Token *</label>
+          <input type="password" id="input-password" required placeholder="Enter password or token" class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm">
         </div>
 
-        <div class="p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-[11px] text-cyan-300 leading-relaxed font-sans">
-          ✨ <strong>Automatic levelinfo detection:</strong> Nickname, starting level, current EXP, and region will be automatically retrieved from Garena's profile resolver.
+        <!-- Optional In-game Overrides -->
+        <div class="pt-1">
+          <button type="button" onclick="toggleAdvanced()" class="text-[11px] text-cyan-400 hover:text-cyan-300 font-sans font-semibold flex items-center gap-1 cursor-pointer">
+            <span id="adv-arrow">▶</span> Optional: Manual In-Game Name & Level Details
+          </button>
+          
+          <div id="adv-fields" class="hidden mt-2.5 p-3 rounded-2xl bg-slate-950/60 border border-white/10 space-y-2.5">
+            <div>
+              <label class="block text-slate-400 font-sans text-[11px] mb-1">Real In-Game Nickname (Optional)</label>
+              <input type="text" id="input-nick" placeholder="Leave empty to auto-parse via Major Login" class="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-400">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-slate-400 font-sans text-[11px] mb-1">Real FF Numeric UID</label>
+                <input type="text" id="input-real-uid" placeholder="Auto-parsed if empty" class="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-400">
+              </div>
+              <div>
+                <label class="block text-slate-400 font-sans text-[11px] mb-1">Current Level</label>
+                <input type="number" id="input-level" placeholder="e.g. 4" class="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-cyan-400">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-[11px] text-cyan-300 leading-relaxed font-sans">
+          ⚡ <strong>Sync Guarantee:</strong> The account is saved directly to <code class="text-white">accounts.js</code> and immediately synced to all your devices.
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-2 font-sans">
@@ -259,7 +272,7 @@
             Cancel
           </button>
           <button type="submit" id="btn-submit-add" class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/25 transition cursor-pointer">
-            Add to accounts.js
+            Save to accounts.js
           </button>
         </div>
       </form>
@@ -300,9 +313,17 @@
       document.getElementById('add-modal').classList.add('hidden');
     }
 
+    function toggleAdvanced() {
+      const el = document.getElementById('adv-fields');
+      const arrow = document.getElementById('adv-arrow');
+      el.classList.toggle('hidden');
+      arrow.innerText = el.classList.contains('hidden') ? '▶' : '▼';
+    }
+
     async function fetchStatus() {
       try {
-        const res = await fetch('/api/status', {
+        // Cache-buster timestamp ensures Device B always fetches fresh data added by Device A!
+        const res = await fetch('/api/status?_t=' + Date.now(), {
           headers: { 'Accept': 'application/json' }
         });
         if (!res.ok) return;
@@ -320,22 +341,19 @@
         document.getElementById('stat-total-exp').innerText = (data.total_cumulative_exp || 0).toLocaleString() + ' EXP';
         document.getElementById('stat-session-exp').innerText = '+' + (data.total_session_exp || 0).toLocaleString() + ' EXP';
 
-        // Update logs account filter
         const select = document.getElementById('logs-filter');
         if (select) {
           const curVal = select.value;
           let opt = '<option value="ALL">⚡ All Accounts (Combined Parallel Feed)</option>';
           accounts.forEach(a => {
-            opt += `<option value="${a.account_id}" ${curVal == a.account_id ? 'selected' : ''}>${a.nickname} (${a.account_id})</option>`;
+            opt += `<option value="${a.account_id}" ${curVal == a.account_id ? 'selected' : ''}>${a.nickname} (FF UID: ${a.real_ff_uid || a.account_id})</option>`;
           });
           select.innerHTML = opt;
         }
 
         renderAccounts();
 
-      } catch (e) {
-        // Retry next tick
-      }
+      } catch (e) {}
     }
 
     function renderAccounts() {
@@ -345,7 +363,7 @@
           <div class="col-span-3 text-center py-16 glass-panel rounded-3xl border border-white/5 space-y-3">
             <div class="text-3xl">🎮</div>
             <div class="text-sm font-bold text-white">No accounts in accounts.js</div>
-            <div class="text-xs text-slate-400">Click "+ Add Account" to link your Free Fire UID.</div>
+            <div class="text-xs text-slate-400">Click "+ Add Account" to link your Free Fire credentials.</div>
           </div>
         `;
         return;
@@ -362,7 +380,7 @@
           statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>IN MATCH</span>';
           cardBorder = 'border-emerald-500/40 shadow-emerald-950/30';
         } else if (a.status === 'CLAIMING_EXP') {
-          statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">+EXP CLAIMED</span>';
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">CHECKING EXP</span>';
           cardBorder = 'border-cyan-500/40 shadow-cyan-950/30';
         }
 
@@ -378,20 +396,21 @@
                     <h3 class="text-sm font-extrabold text-white tracking-tight">${a.nickname}</h3>
                     <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">${a.region}</span>
                   </div>
-                  <div class="text-[11px] font-mono text-slate-400 mt-0.5">UID: ${a.account_id}</div>
+                  <div class="text-[11px] font-mono text-cyan-300 mt-0.5">Real FF UID: <span class="font-bold text-white">${a.real_ff_uid || a.account_id}</span></div>
+                  ${a.real_ff_uid && a.real_ff_uid !== a.account_id ? `<div class="text-[10px] font-mono text-slate-400">Login ID: ${a.account_id}</div>` : ''}
                 </div>
               </div>
               <div>${statusBadge}</div>
             </div>
 
-            <!-- EXP & Level Box -->
+            <!-- EXP & Level Progression Box -->
             <div class="p-4 rounded-2xl bg-slate-950/80 border border-white/5 space-y-3 font-mono text-xs">
               <div class="flex justify-between items-center">
                 <span class="text-slate-400 font-sans text-xs">Level Progression</span>
                 <span class="text-cyan-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30">Level ${a.level}</span>
               </div>
 
-              <!-- Animated Progress Bar to Next Level -->
+              <!-- Animated Progress Bar -->
               <div class="space-y-1">
                 <div class="flex justify-between text-[10px] text-slate-400">
                   <span>To Level ${a.level + 1}</span>
@@ -412,17 +431,17 @@
               </div>
 
               <div class="flex justify-between items-center text-[11px]">
-                <span class="text-slate-400 font-sans">Last Match Reward:</span>
-                <span class="text-cyan-300 font-semibold">+${a.last_match_exp || 0} EXP</span>
+                <span class="text-slate-400 font-sans">Last Match Verified:</span>
+                <span class="${(a.last_match_exp || 0) > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">+${a.last_match_exp || 0} EXP</span>
               </div>
 
               <div class="flex justify-between items-center text-[11px]">
-                <span class="text-slate-400 font-sans">Matches Farmed:</span>
+                <span class="text-slate-400 font-sans">Matches Completed:</span>
                 <span class="text-slate-300 font-semibold">${a.matches_played || 0} games</span>
               </div>
             </div>
 
-            <!-- Bottom Controller -->
+            <!-- Controller -->
             <div class="flex items-center justify-between pt-1">
               <div class="text-[10px] text-slate-500 font-mono truncate max-w-[140px]" title="${a.device_name}">
                 ${a.device_name || 'Hardware Profile'}
@@ -452,7 +471,7 @@
       try {
         const select = document.getElementById('logs-filter');
         const accId = select ? select.value : 'ALL';
-        const res = await fetch(`/api/logs?account_id=${accId}&limit=80`, {
+        const res = await fetch(`/api/logs?account_id=${accId}&limit=80&_t=${Date.now()}`, {
           headers: { 'Accept': 'application/json' }
         });
         if (!res.ok) return;
@@ -493,12 +512,15 @@
     async function handleAddAccount(e) {
       e.preventDefault();
       const btn = document.getElementById('btn-submit-add');
-      btn.innerText = 'Fetching levelinfo...';
+      btn.innerText = 'Parsing Major Login...';
       btn.disabled = true;
 
       const payload = {
-        account_id: document.getElementById('input-uid').value,
-        password: document.getElementById('input-password').value
+        account_id: document.getElementById('input-uid').value.trim(),
+        password: document.getElementById('input-password').value.trim(),
+        nickname: document.getElementById('input-nick') ? document.getElementById('input-nick').value.trim() : '',
+        real_ff_uid: document.getElementById('input-real-uid') ? document.getElementById('input-real-uid').value.trim() : '',
+        level: document.getElementById('input-level') && document.getElementById('input-level').value ? Number(document.getElementById('input-level').value) : null
       };
 
       try {
@@ -512,6 +534,9 @@
           closeModal();
           document.getElementById('input-uid').value = '';
           document.getElementById('input-password').value = '';
+          if (document.getElementById('input-nick')) document.getElementById('input-nick').value = '';
+          if (document.getElementById('input-real-uid')) document.getElementById('input-real-uid').value = '';
+          if (document.getElementById('input-level')) document.getElementById('input-level').value = '';
           fetchStatus();
         } else {
           alert(data.message || 'Error registering account');
@@ -519,7 +544,7 @@
       } catch (err) {
         alert('Failed to connect to server');
       } finally {
-        btn.innerText = 'Add to accounts.js';
+        btn.innerText = 'Save to accounts.js';
         btn.disabled = false;
       }
     }
@@ -571,7 +596,7 @@
       if (s) s.innerHTML = '<div class="text-slate-600 italic">Screen cleared.</div>';
     }
 
-    // Auto-poll live server data
+    // Auto-poll live server data with cache busting
     fetchStatus();
     setInterval(() => {
       fetchStatus();

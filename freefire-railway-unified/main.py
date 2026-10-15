@@ -42,6 +42,15 @@ if os.environ.get("AUTO_START", "true").lower() == "true":
     logger.info("24/7 Background Support Enabled: Spawning parallel farming threads for all accounts in accounts.js...")
     engine.start_all()
 
+@app.after_request
+def add_cache_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    return response
+
 @app.route("/")
 def index():
     if request.headers.get("Accept") == "application/json" or request.args.get("format") == "json":

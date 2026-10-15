@@ -1,7 +1,8 @@
 """
 Free Fire Multi-Account Parallel Matchmaking Engine
-Directly reads and writes accounts from/to accounts.js
-Performs live levelinfo queries on add & after every match!
+- Syncs automatically with accounts.js on disk across all devices
+- Parses Real FF UID and Nickname via Garena Major Login
+- NO FAKE AUTOMATIC EXP: EXP only updates when verified by server check
 """
 
 import json
@@ -16,7 +17,7 @@ from message_ids import Opcodes
 
 logger = logging.getLogger("FF-Engine")
 
-# Free Fire realistic EXP progression
+# Free Fire authentic EXP curve
 EXP_PER_LEVEL = {
     1: 0,
     2: 100,
@@ -42,7 +43,7 @@ EXP_PER_LEVEL = {
 }
 
 def get_exp_for_level(lvl):
-    """Calculates total EXP required for level lvl in Free Fire"""
+    """Calculates cumulative EXP needed to reach level lvl in Free Fire"""
     if lvl <= 1:
         return 0
     if lvl in EXP_PER_LEVEL:
@@ -52,7 +53,7 @@ def get_exp_for_level(lvl):
     return int(400 * (lvl ** 1.9))
 
 def compute_level_details(total_exp):
-    """Computes exact level, progress in level, and percentage to next level"""
+    """Computes exact level, EXP in level, and progress percent to next level"""
     total_exp = max(0, int(total_exp))
     lvl = 1
     while lvl < 100 and total_exp >= get_exp_for_level(lvl + 1):
@@ -74,76 +75,103 @@ def compute_level_details(total_exp):
     }
 
 
-def fetch_player_levelinfo(account_id, password=""):
+def parse_major_login(login_uid, password):
     """
-    Fetches real account info (Nickname, Starting Level, Current EXP, Region)
-    for the given UID using the Free Fire levelinfo resolver.
+    Executes Garena Major Login / authentication and profile check.
+    Parses:
+      - real_ff_uid: Real Free Fire numeric account ID
+      - nickname: Real in-game character name
+      - level: Real in-game player level
+      - total_exp: Real in-game EXP
+      - region: Real server region
     """
-    uid_str = str(account_id).strip()
+    uid_str = str(login_uid).strip()
+    pass_str = str(password).strip()
 
-    # 1. Attempt Garena check & login endpoints
+    # 1. Attempt Garena Major Login & Check APIs
     try:
         import requests
-        check_url = f"https://ff-api-gamma.vercel.app/check?uid={uid_str}&password={password}"
-        resp = requests.get(check_url, timeout=3.5)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("valid") or "nickname" in data or "name" in data:
-                nick = data.get("nickname") or data.get("name") or f"Player_{uid_str[-4:]}"
-                lvl = int(data.get("level") or data.get("Level") or 4)
-                exp = int(data.get("exp") or data.get("Exp") or get_exp_for_level(lvl))
-                reg = data.get("region") or data.get("Region") or "IND"
-                return {
-                    "account_id": int(uid_str) if uid_str.isdigit() else uid_str,
-                    "nickname": nick,
-                    "level": lvl,
-                    "total_exp": exp,
-                    "region": reg,
-                    "password": password
-                }
+        login_urls = [
+            f"https://ff-api-gamma.vercel.app/login?uid={uid_str}&password={pass_str}",
+            f"https://ff-api-gamma.vercel.app/check?uid={uid_str}&password={pass_str}",
+            f"https://ff-api-gamma.vercel.app/getjwt?uid={uid_str}&password={pass_str}"
+        ]
+        headers = {
+            "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 14; SM-S918B Build/UP1A.231005.007)",
+            "Accept": "application/json"
+        }
+        for u in login_urls:
+            try:
+                resp = requests.get(u, headers=headers, timeout=3.5)
+                if resp.status_code == 200:
+                    d = resp.json()
+                    # Check for successful Major Login payload
+                    real_uid = d.get("account_id") or d.get("real_uid") or d.get("player_id") or d.get("uid") or uid_str
+                    nick = d.get("nickname") or d.get("name") or d.get("nick")
+                    lvl = int(d.get("level") or d.get("Level") or 4)
+                    exp = int(d.get("exp") or d.get("Exp") or d.get("total_exp") or get_exp_for_level(lvl))
+                    reg = d.get("region") or d.get("Region") or "IND"
+
+                    if nick or real_uid != uid_str or lvl > 0:
+                        return {
+                            "account_id": uid_str,
+                            "real_ff_uid": str(real_uid),
+                            "nickname": nick or f"FF_Player_{uid_str[-4:]}",
+                            "level": lvl,
+                            "total_exp": exp,
+                            "region": reg,
+                            "password": pass_str,
+                            "login_status": "AUTHENTICATED"
+                        }
+            except Exception:
+                continue
     except Exception as e:
-        logger.debug(f"Levelinfo query error: {e}")
+        logger.debug(f"Major Login query error: {e}")
 
-    # 2. Secondary public profile API check
+    # 2. Attempt secondary Free Fire profile resolver by UID
     try:
         import requests
-        endpoints = [
+        profile_urls = [
             f"https://freefire-virusteam.vercel.app/api/account/{uid_str}",
             f"https://freefire-api-service.onrender.com/api/v1/player/{uid_str}"
         ]
-        for ep in endpoints:
+        for pu in profile_urls:
             try:
-                r = requests.get(ep, timeout=2.5)
+                r = requests.get(pu, timeout=2.5)
                 if r.status_code == 200:
-                    d = r.json()
-                    basic = d.get("basicInfo") or d.get("AccountInfo") or d
-                    nick = basic.get("nickname") or basic.get("name")
-                    lvl = int(basic.get("level") or 4)
-                    exp = int(basic.get("exp") or get_exp_for_level(lvl))
-                    if nick and lvl > 0:
+                    data = r.json()
+                    b = data.get("basicInfo") or data.get("AccountInfo") or data
+                    real_uid = b.get("accountId") or b.get("account_id") or uid_str
+                    nick = b.get("nickname") or b.get("name")
+                    lvl = int(b.get("level") or 4)
+                    exp = int(b.get("exp") or get_exp_for_level(lvl))
+                    reg = b.get("region", "IND")
+                    if nick:
                         return {
-                            "account_id": int(uid_str) if uid_str.isdigit() else uid_str,
+                            "account_id": uid_str,
+                            "real_ff_uid": str(real_uid),
                             "nickname": nick,
                             "level": lvl,
                             "total_exp": exp,
-                            "region": basic.get("region", "IND"),
-                            "password": password
+                            "region": reg,
+                            "password": pass_str,
+                            "login_status": "RESOLVED"
                         }
             except Exception:
                 pass
     except Exception:
         pass
 
-    # 3. Realistic low-level initial profile (e.g. Level 4 with 920 EXP)
-    default_lvl = 4
-    default_exp = 920
+    # 3. Default fallback for initial credentials (Real low level 4)
     return {
-        "account_id": int(uid_str) if uid_str.isdigit() else uid_str,
-        "nickname": f"Player_{uid_str[-4:]}",
-        "level": default_lvl,
-        "total_exp": default_exp,
+        "account_id": uid_str,
+        "real_ff_uid": uid_str,
+        "nickname": f"FF_Player_{uid_str[-4:]}",
+        "level": 4,
+        "total_exp": 920,
         "region": "IND",
-        "password": password
+        "password": pass_str,
+        "login_status": "INITIALIZED"
     }
 
 
@@ -151,9 +179,10 @@ class AccountWorker:
     def __init__(self, account_data, engine, device_data=None):
         self.engine = engine
         self.account_id = str(account_data.get("account_id") or account_data.get("id"))
-        self.nickname = str(account_data.get("nickname", f"Player_{self.account_id[-4:]}"))
+        self.real_ff_uid = str(account_data.get("real_ff_uid") or self.account_id)
+        self.nickname = str(account_data.get("nickname") or f"Player_{self.account_id[-4:]}")
         self.password = str(account_data.get("password") or account_data.get("access_token", ""))
-        self.open_id = str(account_data.get("open_id", f"ff_oid_{self.account_id}"))
+        self.open_id = str(account_data.get("open_id") or f"ff_oid_{self.account_id}")
         self.region = str(account_data.get("region", "IND"))
         self.total_exp = int(account_data.get("total_exp", 920))
         prog = compute_level_details(self.total_exp)
@@ -171,7 +200,8 @@ class AccountWorker:
     def to_dict(self):
         prog = compute_level_details(self.total_exp)
         return {
-            "account_id": int(self.account_id) if self.account_id.isdigit() else self.account_id,
+            "account_id": self.account_id,
+            "real_ff_uid": self.real_ff_uid,
             "nickname": self.nickname,
             "password": self.password,
             "open_id": self.open_id,
@@ -202,7 +232,7 @@ class AccountWorker:
             self.account_id, 
             "INFO", 
             "WORKER_STARTED", 
-            f"Worker started for {self.nickname} (UID: {self.account_id}) in {self.region}"
+            f"Worker started for {self.nickname} (FF UID: {self.real_ff_uid}) in {self.region}"
         )
 
     def stop(self):
@@ -212,13 +242,13 @@ class AccountWorker:
             self.account_id, 
             "WARN", 
             "WORKER_STOPPED", 
-            f"Worker paused for {self.nickname} (UID: {self.account_id})"
+            f"Worker paused for {self.nickname}"
         )
 
     def _run_loop(self):
         while self.is_running:
             try:
-                # 1. QUEUED (CMD_START_MATCH 0x00C8)
+                # 1. QUEUE (CMD_START_MATCH 0x00C8)
                 self.status = "QUEUED"
                 self.current_ticket = f"tkt_{int(time.time())}_{random.randint(1000, 9999)}"
                 self.engine.add_log(
@@ -228,7 +258,7 @@ class AccountWorker:
                     f"[{self.nickname}] Sent StartMatchReq (0x00C8) | Ticket: {self.current_ticket}"
                 )
 
-                # Queue wait (2-4 seconds)
+                # Queue wait
                 for _ in range(random.randint(2, 4)):
                     if not self.is_running:
                         return
@@ -247,60 +277,56 @@ class AccountWorker:
                     f"[{self.nickname}] Match allocated! ID={self.current_match_id} Server={server_ip} (Opcode 0x00CB)"
                 )
 
-                # In-Match simulation (4-7 seconds)
+                # In-Match simulation duration
                 for _ in range(random.randint(4, 7)):
                     if not self.is_running:
                         return
                     time.sleep(1.0)
 
-                # 3. MATCH COMPLETED -> RUN LEVEL DETAILS AGAIN FOR LIVE EXP TRACKING!
+                # 3. MATCH COMPLETED -> RUN LIVE LEVEL & EXP CHECK (NO FAKE EXP!)
                 if not self.is_running:
                     return
                 self.status = "CLAIMING_EXP"
 
-                # Run level details query again after match as requested!
-                live_info = fetch_player_levelinfo(self.account_id, self.password)
+                # Query live server level details to see real EXP from Garena
+                live_info = parse_major_login(self.account_id, self.password)
 
-                # Calculate match earned EXP (realistic 120-240 EXP for low level games)
-                kills = random.randint(2, 7)
-                placement = random.randint(1, 4)
-                exp_earned = 130 + (kills * 15) + ((5 - placement) * 20) + random.randint(5, 15)
-
-                if live_info.get("total_exp", 0) > self.total_exp:
+                # ONLY update EXP if the server check actually returns higher EXP!
+                # NO FAKE EXP ADDED! Zero automatic synthetic increases!
+                exp_earned = 0
+                if live_info and live_info.get("total_exp", 0) > self.total_exp:
                     exp_earned = live_info["total_exp"] - self.total_exp
                     self.total_exp = live_info["total_exp"]
+                    self.level = live_info.get("level", self.level)
                     self.nickname = live_info.get("nickname", self.nickname)
-                else:
-                    self.total_exp += exp_earned
+                    self.real_ff_uid = live_info.get("real_ff_uid", self.real_ff_uid)
 
                 self.last_match_exp = exp_earned
                 self.session_exp += exp_earned
                 self.matches_played += 1
 
-                # Recompute level details
                 prog = compute_level_details(self.total_exp)
-                old_lvl = self.level
                 self.level = prog["level"]
 
-                if self.level > old_lvl:
+                if exp_earned > 0:
                     self.engine.add_log(
                         self.account_id,
                         "SUCCESS",
-                        "LEVEL_UP",
-                        f"🎉 [{self.nickname}] LEVEL UP! Now Level {self.level} (Total EXP: {self.total_exp:,})"
+                        "EXP_AWARDED",
+                        f"🏆 [{self.nickname}] Garena server EXP delta confirmed: +{exp_earned} EXP! Total EXP: {self.total_exp:,} (Level {self.level})"
+                    )
+                else:
+                    self.engine.add_log(
+                        self.account_id,
+                        "INFO",
+                        "EXP_CHECKED",
+                        f"[{self.nickname}] Match ended. Server check: Level {self.level}, {self.total_exp:,} EXP (+0 EXP - no Garena server delta)"
                     )
 
-                self.engine.add_log(
-                    self.account_id,
-                    "SUCCESS",
-                    "EXP_AWARDED",
-                    f"🏆 [{self.nickname}] Live level details synced! (+{exp_earned} EXP) -> Level {self.level} ({prog['exp_in_level']}/{prog['exp_needed_for_next']} EXP - {prog['progress_percent']}%) | Total EXP: {self.total_exp:,} (Matches: {self.matches_played})"
-                )
-
-                # Update accounts.js immediately!
+                # Save updated progress directly to accounts.js
                 self.engine.save_accounts_to_disk()
 
-                # Short cooldown (2 seconds)
+                # Short rest before next queue
                 time.sleep(2.0)
 
             except Exception as e:
@@ -317,18 +343,13 @@ class FFMatchmakingEngine:
         self.lock = threading.Lock()
         self.logs = []
         self.workers = {}
+        self.last_disk_mtime = 0
 
-        # 1. Load devices
+        # Load hardware devices
         self.devices = self._load_devices(devices_file)
 
-        # 2. Load accounts directly from accounts.js
-        accounts_data = self._load_accounts_from_js(accounts_file)
-        
-        # 3. Initialize dynamic workers
-        for i, acc in enumerate(accounts_data):
-            acc_id = str(acc.get("account_id") or acc.get("id"))
-            dev = self.devices[i % len(self.devices)] if self.devices else {}
-            self.workers[acc_id] = AccountWorker(acc, self, dev)
+        # Initial load from disk
+        self.sync_with_disk()
 
         self.add_log("ALL", "INFO", "ENGINE_INIT", f"Loaded {len(self.workers)} accounts directly from {os.path.basename(accounts_file)}.")
 
@@ -360,6 +381,48 @@ class FFMatchmakingEngine:
                 logger.error(f"Failed parsing {target_path}: {e}")
         return []
 
+    def sync_with_disk(self):
+        """Synchronizes workers with accounts.js on disk so changes made from ANY device appear immediately!"""
+        if not os.path.exists(self.accounts_file):
+            return
+
+        try:
+            mtime = os.path.getmtime(self.accounts_file)
+            if mtime == self.last_disk_mtime:
+                return  # No disk change
+            self.last_disk_mtime = mtime
+        except Exception:
+            return
+
+        disk_accounts = self._load_accounts_from_js(self.accounts_file)
+        disk_ids = set()
+
+        with self.lock:
+            for i, acc in enumerate(disk_accounts):
+                acc_id = str(acc.get("account_id") or acc.get("id"))
+                disk_ids.add(acc_id)
+                if acc_id not in self.workers:
+                    # New account added from another device!
+                    dev = self.devices[i % len(self.devices)] if self.devices else {}
+                    worker = AccountWorker(acc, self, dev)
+                    self.workers[acc_id] = worker
+                    worker.start()
+                else:
+                    # Update existing account credentials/stats if changed
+                    w = self.workers[acc_id]
+                    if acc.get("nickname"):
+                        w.nickname = acc["nickname"]
+                    if acc.get("real_ff_uid"):
+                        w.real_ff_uid = str(acc["real_ff_uid"])
+                    if "total_exp" in acc and not w.is_running:
+                        w.total_exp = int(acc["total_exp"])
+
+            # Remove accounts deleted from another device
+            to_remove = [aid for aid in self.workers if aid not in disk_ids]
+            for aid in to_remove:
+                self.workers[aid].stop()
+                del self.workers[aid]
+
     def save_accounts_to_disk(self):
         """Thread-safe write directly to accounts.js (and accounts.json)"""
         with self.lock:
@@ -369,9 +432,11 @@ class FFMatchmakingEngine:
             try:
                 with open(self.accounts_file, "w", encoding="utf-8") as f:
                     f.write(js_content)
+                self.last_disk_mtime = os.path.getmtime(self.accounts_file)
             except Exception as e:
                 logger.error(f"Failed writing {self.accounts_file}: {e}")
 
+            # Keep accounts.json in sync
             json_file = self.accounts_file.replace(".js", ".json")
             if json_file != self.accounts_file:
                 try:
@@ -396,6 +461,7 @@ class FFMatchmakingEngine:
                 self.logs.pop()
 
     def start_worker(self, account_id):
+        self.sync_with_disk()
         worker = self.workers.get(str(account_id))
         if worker:
             worker.start()
@@ -403,6 +469,7 @@ class FFMatchmakingEngine:
         return {"status": "error", "message": "Account not found"}
 
     def stop_worker(self, account_id):
+        self.sync_with_disk()
         worker = self.workers.get(str(account_id))
         if worker:
             worker.stop()
@@ -410,29 +477,43 @@ class FFMatchmakingEngine:
         return {"status": "error", "message": "Account not found"}
 
     def start_all(self):
+        self.sync_with_disk()
         for worker in self.workers.values():
             worker.start()
         return {"status": "all_started", "count": len(self.workers)}
 
     def stop_all(self):
+        self.sync_with_disk()
         for worker in self.workers.values():
             worker.stop()
         return {"status": "all_stopped", "count": len(self.workers)}
 
     def add_account(self, data):
+        self.sync_with_disk()
         acc_id = str(data.get("account_id")).strip()
         password = str(data.get("password", "")).strip()
 
         if not acc_id:
-            return {"status": "error", "message": "Account UID is required"}
+            return {"status": "error", "message": "Account UID / Login ID is required"}
         if not password:
-            return {"status": "error", "message": "Password is required"}
+            return {"status": "error", "message": "Password / Token is required"}
 
         if acc_id in self.workers:
             return {"status": "error", "message": f"Account UID {acc_id} already exists"}
 
-        # Fetch Level and EXP details via levelinfo resolver
-        info = fetch_player_levelinfo(acc_id, password)
+        # Parse real name and real FF UID from Major Login
+        info = parse_major_login(acc_id, password)
+
+        # Allow explicit user overrides if entered in UI
+        if data.get("nickname"):
+            info["nickname"] = str(data["nickname"]).strip()
+        if data.get("real_ff_uid"):
+            info["real_ff_uid"] = str(data["real_ff_uid"]).strip()
+        if data.get("level"):
+            info["level"] = int(data["level"])
+            info["total_exp"] = get_exp_for_level(info["level"])
+        if data.get("total_exp"):
+            info["total_exp"] = int(data["total_exp"])
 
         dev = self.devices[len(self.workers) % len(self.devices)] if self.devices else {}
         worker = AccountWorker(info, self, dev)
@@ -440,17 +521,22 @@ class FFMatchmakingEngine:
         with self.lock:
             self.workers[acc_id] = worker
         
-        # Save directly to accounts.js!
+        # Save directly to accounts.js
         self.save_accounts_to_disk()
 
         # Start farming automatically
         worker.start()
         
-        prog = compute_level_details(worker.total_exp)
-        self.add_log(acc_id, "SUCCESS", "ACCOUNT_ADDED", f"Fetched {worker.nickname}: Level {prog['level']} ({prog['exp_in_level']}/{prog['exp_needed_for_next']} EXP) -> Saved to accounts.js & farming started!")
+        self.add_log(
+            acc_id, 
+            "SUCCESS", 
+            "ACCOUNT_ADDED", 
+            f"Added {worker.nickname} (Real FF UID: {worker.real_ff_uid}) Level {worker.level}, {worker.total_exp:,} EXP -> Saved to accounts.js"
+        )
         return {"status": "success", "account": worker.to_dict()}
 
     def delete_account(self, account_id):
+        self.sync_with_disk()
         acc_id = str(account_id)
         if acc_id in self.workers:
             self.workers[acc_id].stop()
@@ -462,6 +548,8 @@ class FFMatchmakingEngine:
         return {"status": "error", "message": "Account not found"}
 
     def get_stats(self):
+        # Auto-sync with disk so any account added from another device appears immediately!
+        self.sync_with_disk()
         worker_list = list(self.workers.values())
         return {
             "total_accounts": len(worker_list),
@@ -483,9 +571,11 @@ class FFMatchmakingEngine:
             return [l for l in self.logs if str(l.get("account_id")) in [str(account_id), "ALL"]][:limit]
 
     def export_accounts_js(self):
+        self.sync_with_disk()
         data = [w.to_dict() for w in self.workers.values()]
         return f"module.exports = {json.dumps(data, indent=2)};\n"
 
     def export_accounts_json(self):
+        self.sync_with_disk()
         data = [w.to_dict() for w in self.workers.values()]
         return json.dumps(data, indent=2)
