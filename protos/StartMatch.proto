@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package ff.matchmaking;
+
+message PlayerSlot {
+  int64 account_id = 1;
+  string nickname = 2;
+  int32 level = 3;
+  int32 rank_score = 4;
+  string character_id = 5;
+  repeated int32 equipped_skills = 6;
+  bool is_leader = 7;
+}
+
+message StartMatchReq {
+  int64 account_id = 1;
+  int32 game_mode = 2;
+  int32 team_type = 3;
+  string region = 4;
+  string client_version = 5;
+  int64 timestamp = 6;
+  bytes nonce = 7;
+  repeated PlayerSlot team_members = 8;
+  string map_preference = 9;
+}
+
+message StartMatchResp {
+  int32 status = 1;
+  string match_ticket = 2;
+  int32 estimated_wait_sec = 3;
+  string game_server_ip = 4;
+  int32 game_server_port = 5;
+  bytes encryption_key = 6;
+  string error_message = 7;
+}

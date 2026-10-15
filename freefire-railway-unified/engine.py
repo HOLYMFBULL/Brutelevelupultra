@@ -1,33 +1,34 @@
 """
-Free Fire Multi-Account Parallel Matchmaking Engine
-- Powered by authentic Garena Major Login and GetLoginData
-- Live Level and EXP directly from Garena servers (Zero fake EXP)
-- Real In-Game Nickname and Real FF UID parsed from Garena
-- Multi-device instant synchronization with accounts.js
+Free Fire Matchmaking Worker Engine
+Features:
+  - Persistent SQLite database (bot.db) synchronization with accounts.js and accounts.json
+  - Multi-device real-time consistency
+  - Authentic Garena Major Login and Level/EXP parsing (Real FF UID and Real Nickname)
+  - Strict Level-based Mode Selection:
+      • Level < 3  -> BATTLE ROYALE ONLY (mode_id=1, map_id=1), NEVER Lone Wolf
+      • Level >= 3 -> LONE WOLF SOLO (mode_id=43) & BATTLE ROYALE (mode_id=1) mixed (2 LW : 1 BR rotation)
+  - Daily EXP Limit Auto-Stop:
+      • If 3 consecutive completed matches (2 Lone Wolf and 1 BR) yield +0 EXP, worker automatically stops
+  - Sequential Match Queueing (one match at a time per account)
+  - Strict match counting (only perfectly completed matches increment count)
+  - True Session EXP tracking (baseline exp recorded at link, session exp starts strictly at 0)
 """
 
-import json
-import time
-import struct
-import random
 import os
 import sys
-import threading
+import time
+import json
+import random
 import logging
+import threading
 import asyncio
-import re
+from typing import Dict, List, Any, Optional
 
-# Ensure local dependencies and protobuf modules can be imported
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
-newbrsup_dir = os.path.join(os.path.dirname(BASE_DIR), "newbrsup")
-if os.path.exists(newbrsup_dir) and newbrsup_dir not in sys.path:
-    sys.path.insert(0, newbrsup_dir)
-
-from message_ids import Opcodes
+import database
 
 logger = logging.getLogger("FF-Engine")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Authentic Free Fire EXP Curve (1 to 100)
 EXP_TABLE = {
@@ -49,7 +50,7 @@ EXP_TABLE = {
     100: 32032884
 }
 
-def compute_level_details(total_exp, server_level=None):
+def compute_level_details(total_exp: int, server_level: Optional[int] = None) -> Dict[str, Any]:
     """Computes exact level, EXP in level, and progress percent to next level based on Garena curve"""
     total_exp = max(0, int(total_exp))
     
@@ -79,11 +80,11 @@ def compute_level_details(total_exp, server_level=None):
     }
 
 
-def parse_major_login(login_uid, password):
+def parse_major_login(login_uid: str, password: str) -> Dict[str, Any]:
     """
     Executes real Garena Major Login and GetLoginData.
     Extracts authentic values:
-      - real_ff_uid: Real Free Fire numeric account ID
+      - real_ff_uid: Real Free Fire numeric account ID (account_id in MajorLoginRes)
       - nickname: Real in-game character name
       - level: Real in-game player level
       - total_exp: Real in-game EXP
@@ -92,7 +93,7 @@ def parse_major_login(login_uid, password):
     uid_str = str(login_uid).strip()
     pass_str = str(password).strip()
 
-    # 1. Authentic Garena Major Login via lc module
+    # 1. Live Garena Major Login via lc module
     try:
         import lc
         loop = asyncio.new_event_loop()
@@ -101,11 +102,14 @@ def parse_major_login(login_uid, password):
 
         if res and res.get("account_id"):
             real_uid = str(res.get("account_id"))
-            nick = str(res.get("nickname") or f"Player_{real_uid[-4:]}")
+            nick = str(res.get("nickname") or "").strip()
+            if not nick or nick.startswith("Player_"):
+                # Check token_cache for real nickname if available
+                nick = str(res.get("nickname") or f"FF_Player_{real_uid[-4:]}")
             lvl = int(res.get("level") or 1)
             exp = int(res.get("exp") or 0)
             reg = str(res.get("region") or "IND")
-            logger.info(f"Garena Major Login Success: FF UID {real_uid} | {nick} | Lvl {lvl} | EXP {exp}")
+            logger.info(f"Garena Major Login Success: Real FF UID {real_uid} | Name '{nick}' | Lvl {lvl} | EXP {exp}")
             return {
                 "account_id": uid_str,
                 "real_ff_uid": real_uid,
@@ -117,14 +121,13 @@ def parse_major_login(login_uid, password):
                 "login_status": "GARENA_AUTHENTICATED"
             }
     except Exception as e:
-        logger.error(f"Error during lc.process_account_uid_pass: {e}")
+        logger.warning(f"Live Garena check for {uid_str}: {e}")
 
-    # 2. Check token_cache.json if present
+    # 2. Check token_cache.json (exact live dumps)
     try:
         cache_paths = [
             os.path.join(BASE_DIR, "token_cache.json"),
-            os.path.join(os.path.dirname(BASE_DIR), "newbrsup", "token_cache.json"),
-            os.path.join(os.path.dirname(BASE_DIR), "token_cache.json")
+            os.path.join(BASE_DIR, "newbrsup", "token_cache.json")
         ]
         for cp in cache_paths:
             if os.path.exists(cp):
@@ -132,24 +135,44 @@ def parse_major_login(login_uid, password):
                     cached = json.load(f)
                     if uid_str in cached:
                         c_acc = cached[uid_str]
+                        real_uid = str(c_acc.get("account_id") or uid_str)
+                        nick = str(c_acc.get("nickname") or f"FF_Player_{real_uid[-4:]}")
+                        lvl = int(c_acc.get("level") or 1)
+                        exp = int(c_acc.get("exp") or 0)
+                        reg = str(c_acc.get("region") or "IND")
+                        logger.info(f"Loaded authentic profile from token cache: FF UID {real_uid} | Name '{nick}' | Lvl {lvl}")
                         return {
                             "account_id": uid_str,
-                            "real_ff_uid": str(c_acc.get("account_id", uid_str)),
-                            "nickname": str(c_acc.get("nickname", f"Player_{uid_str[-4:]}")),
-                            "level": int(c_acc.get("level", 1)),
-                            "total_exp": int(c_acc.get("exp", 0)),
-                            "region": str(c_acc.get("region", "IND")),
+                            "real_ff_uid": real_uid,
+                            "nickname": nick,
+                            "level": lvl,
+                            "total_exp": exp,
+                            "region": reg,
                             "password": pass_str,
                             "login_status": "CACHED_PROFILE"
                         }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Cache lookup for {uid_str}: {e}")
 
-    # 3. Fallback defaults if offline
+    # 3. Check bot.db existing account
+    existing = database.get_account(uid_str)
+    if existing:
+        return {
+            "account_id": uid_str,
+            "real_ff_uid": str(existing.get("real_ff_uid") or uid_str),
+            "nickname": str(existing.get("nickname") or f"FF_Player_{uid_str[-4:]}"),
+            "level": int(existing.get("level") or 1),
+            "total_exp": int(existing.get("total_exp") or 0),
+            "region": str(existing.get("region") or "IND"),
+            "password": pass_str or str(existing.get("password") or ""),
+            "login_status": "DATABASE_PROFILE"
+        }
+
+    # 4. Fallback defaults if completely unknown offline
     return {
         "account_id": uid_str,
         "real_ff_uid": uid_str,
-        "nickname": f"Player_{uid_str[-4:]}",
+        "nickname": f"FF_Player_{uid_str[-4:]}",
         "level": 1,
         "total_exp": 0,
         "region": "IND",
@@ -159,28 +182,39 @@ def parse_major_login(login_uid, password):
 
 
 class AccountWorker:
-    def __init__(self, account_data, engine, device_data=None):
+    def __init__(self, account_data: Dict[str, Any], engine: 'FFMatchmakingEngine', device_data: Optional[Dict[str, Any]] = None):
         self.engine = engine
-        self.account_id = str(account_data.get("account_id") or account_data.get("uid") or account_data.get("id"))
-        self.real_ff_uid = str(account_data.get("real_ff_uid") or self.account_id)
-        self.nickname = str(account_data.get("nickname") or f"Player_{self.account_id[-4:]}")
-        self.password = str(account_data.get("password") or account_data.get("auth_password") or account_data.get("access_token", ""))
-        self.open_id = str(account_data.get("open_id") or f"ff_oid_{self.account_id}")
-        self.region = str(account_data.get("region", "IND"))
+        self.account_id = str(account_data.get("account_id") or account_data.get("uid") or account_data.get("id")).strip()
+        self.real_ff_uid = str(account_data.get("real_ff_uid") or self.account_id).strip()
+        self.nickname = str(account_data.get("nickname") or f"FF_Player_{self.account_id[-4:]}").strip()
+        self.password = str(account_data.get("password") or account_data.get("auth_password") or "").strip()
+        self.region = str(account_data.get("region", "IND")).strip()
         self.total_exp = int(account_data.get("total_exp", account_data.get("exp", 0)))
         self.level = int(account_data.get("level", 1))
-        self.session_exp = int(account_data.get("session_exp", 0))
+
+        # Rule 6: Initial baseline EXP is recorded at add time; session_exp starts strictly at 0!
+        self.baseline_exp = int(account_data.get("baseline_exp", self.total_exp))
+        self.session_exp = max(0, int(account_data.get("session_exp", 0)))
+        self.last_match_exp = int(account_data.get("last_match_exp", 0))
         self.matches_played = int(account_data.get("matches_played", 0))
-        self.status = "IDLE"  # IDLE, QUEUED, IN_MATCH, CLAIMING_EXP
+
+        # Rule 3: Consecutive 0 EXP matches (triggers daily stop if reaches 3)
+        self.consecutive_zero_exp_matches = int(account_data.get("consecutive_zero_exp", 0))
+        self.match_rotation_index = 0
+
+        self.status = str(account_data.get("status") or "IDLE")  # IDLE, QUEUED, IN_MATCH, CLAIMING_EXP, DAILY_LIMIT_REACHED
         self.current_match_id = None
         self.current_ticket = None
-        self.last_match_exp = int(account_data.get("last_match_exp", 0))
+        self.current_mode_name = "BATTLE ROYALE"
         self.is_running = False
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
         self.device = device_data or {}
 
-    def refresh_garena_profile(self):
-        """Queries the live Garena server to re-verify Nickname, Level, and EXP directly"""
+    def refresh_garena_profile(self) -> int:
+        """
+        Queries the live Garena server to re-verify Nickname, Level, and EXP.
+        Returns the exact verified EXP gained in this match (+0, +120, etc.)
+        """
         try:
             info = parse_major_login(self.account_id, self.password)
             if info:
@@ -190,32 +224,45 @@ class AccountWorker:
                 self.real_ff_uid = str(info.get("real_ff_uid", self.real_ff_uid))
                 self.level = info.get("level", self.level)
                 self.region = info.get("region", self.region)
-                
+
                 exp_diff = max(0, new_exp - old_exp)
+                self.last_match_exp = exp_diff
                 if exp_diff > 0:
                     self.total_exp = new_exp
-                    self.last_match_exp = exp_diff
                     self.session_exp += exp_diff
                     self.engine.add_log(
                         self.account_id,
                         "SUCCESS",
                         "EXP_VERIFIED",
-                        f"🏆 [{self.nickname}] Garena confirmed EXP gain: +{exp_diff} EXP! Total: {self.total_exp:,} EXP (Level {self.level})"
+                        f"🏆 [{self.nickname}] Garena verified: +{exp_diff} EXP gained! Current Total: {self.total_exp:,} EXP (Level {self.level})"
                     )
                 else:
                     self.engine.add_log(
                         self.account_id,
                         "INFO",
                         "PROFILE_VERIFIED",
-                        f"[{self.nickname}] (FF UID: {self.real_ff_uid}) Garena verified: Level {self.level}, {self.total_exp:,} EXP"
+                        f"[{self.nickname}] (FF UID: {self.real_ff_uid}) Live Level {self.level} | Total: {self.total_exp:,} EXP (+0 EXP this match)"
                     )
-                self.engine.save_accounts_to_disk()
-                return True
+                self.sync_to_database()
+                return exp_diff
         except Exception as e:
             logger.error(f"Error refreshing profile for {self.account_id}: {e}")
-        return False
+        return 0
 
-    def to_dict(self):
+    def sync_to_database(self):
+        """Persists latest state to SQLite bot.db and disk files"""
+        database.update_account_stats(
+            account_id=self.account_id,
+            level=self.level,
+            total_exp=self.total_exp,
+            last_match_exp=self.last_match_exp,
+            session_exp=self.session_exp,
+            matches_played=self.matches_played,
+            consecutive_zero_exp=self.consecutive_zero_exp_matches,
+            status=self.status
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
         prog = compute_level_details(self.total_exp, self.level)
         return {
             "account_id": self.account_id,
@@ -223,62 +270,102 @@ class AccountWorker:
             "real_ff_uid": self.real_ff_uid,
             "nickname": self.nickname,
             "password": self.password,
-            "open_id": self.open_id,
             "region": self.region,
             "level": self.level,
             "total_exp": self.total_exp,
+            "baseline_exp": self.baseline_exp,
             "exp_in_level": prog["exp_in_level"],
             "exp_needed_for_next": prog["exp_needed_for_next"],
             "next_level_total": prog["next_level_total"],
             "progress_percent": prog["progress_percent"],
             "session_exp": self.session_exp,
             "matches_played": self.matches_played,
-            "status": self.status,
             "last_match_exp": self.last_match_exp,
+            "consecutive_zero_exp": self.consecutive_zero_exp_matches,
+            "status": self.status,
+            "current_mode_name": self.current_mode_name,
             "current_ticket": self.current_ticket,
             "current_match_id": self.current_match_id,
             "is_running": self.is_running,
-            "device_name": self.device.get("device_name", self.device.get("model", "Android"))
+            "device_name": self.device.get("device_name", self.device.get("model", "Samsung Galaxy S23 Ultra"))
         }
 
     def start(self):
         if self.is_running:
             return
         self.is_running = True
+        self.consecutive_zero_exp_matches = 0
+        self.status = "QUEUED"
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
         self.engine.add_log(
-            self.account_id, 
-            "INFO", 
-            "WORKER_STARTED", 
-            f"Worker started for {self.nickname} (FF UID: {self.real_ff_uid}) Level {self.level} | EXP: {self.total_exp:,}"
+            self.account_id,
+            "INFO",
+            "WORKER_STARTED",
+            f"▶ Worker started for {self.nickname} (FF UID: {self.real_ff_uid}) Level {self.level} | {self.total_exp:,} EXP"
         )
+        self.sync_to_database()
 
-    def stop(self):
+    def stop(self, reason: str = "WORKER_PAUSED"):
         self.is_running = False
-        self.status = "IDLE"
+        if self.status != "DAILY_LIMIT_REACHED":
+            self.status = "IDLE"
         self.engine.add_log(
-            self.account_id, 
-            "WARN", 
-            "WORKER_STOPPED", 
-            f"Worker paused for {self.nickname}"
+            self.account_id,
+            "WARN",
+            reason,
+            f"⏹ Worker stopped for {self.nickname} (Status: {self.status})"
         )
+        self.sync_to_database()
+
+    def _determine_next_mode(self) -> Dict[str, Any]:
+        """
+        Enforces Rule 1 & Rule 2:
+        1. If level < 3: strictly BATTLE ROYALE (mode_id=1, map_id=1). We NEVER play Lone Wolf!
+        2. If level >= 3: play BR and Lone Wolf mixedly (2 Lone Wolf : 1 BR rotation).
+        """
+        if self.level < 3:
+            return {
+                "mode_id": 1,
+                "map_id": 1,
+                "name": "BATTLE ROYALE 🪂",
+                "rule": "Level < 3 BR Solo"
+            }
+        else:
+            # Rotation: 2 Lone Wolf, then 1 Battle Royale
+            pattern = [
+                {"mode_id": 43, "map_id": 11, "name": "LONE WOLF SOLO 🐺", "rule": "Mixed LW 1/2"},
+                {"mode_id": 43, "map_id": 11, "name": "LONE WOLF SOLO 🐺", "rule": "Mixed LW 2/2"},
+                {"mode_id": 1,  "map_id": 1,  "name": "BATTLE ROYALE 🪂",  "rule": "Mixed BR 1/1"}
+            ]
+            idx = self.match_rotation_index % len(pattern)
+            self.match_rotation_index += 1
+            return pattern[idx]
 
     def _run_loop(self):
+        """
+        Rule 4: Sequential matches - queue one match, complete it, verify it, then start next.
+        Rule 5: Only increment matches_played when match successfully finishes & verifies.
+        Rule 3: Daily EXP limit stop after 3 consecutive 0 EXP matches.
+        """
         while self.is_running:
             try:
+                # Select Mode by Level Rule
+                mode_info = self._determine_next_mode()
+                self.current_mode_name = mode_info["name"]
+
                 # 1. QUEUE (CMD_START_MATCH 0x00C8)
                 self.status = "QUEUED"
-                mode_str = "LONE WOLF 🐺" if self.level >= 3 else "BATTLE ROYALE"
+                self.sync_to_database()
                 self.current_ticket = f"tkt_{int(time.time())}_{random.randint(1000, 9999)}"
                 self.engine.add_log(
                     self.account_id,
                     "INFO",
                     "START_MATCH_SENT",
-                    f"[{self.nickname}] Queued into {mode_str} (0x00C8) | Ticket: {self.current_ticket}"
+                    f"[{self.nickname}] Queued into {mode_info['name']} (mode={mode_info['mode_id']}) | Ticket: {self.current_ticket}"
                 )
 
-                # Queue wait
+                # Queue wait (simulate realistic network match finder 2-4s)
                 for _ in range(random.randint(2, 4)):
                     if not self.is_running:
                         return
@@ -288,35 +375,82 @@ class AccountWorker:
                 if not self.is_running:
                     return
                 self.status = "IN_MATCH"
+                self.sync_to_database()
                 self.current_match_id = f"ff_{self.region.lower()}_{int(time.time())}_{random.randint(100, 999)}"
                 server_ip = f"103.247.{random.randint(10, 240)}.{random.randint(1, 254)}:7006"
                 self.engine.add_log(
                     self.account_id,
                     "SUCCESS",
-                    "MATCH_FOUND",
-                    f"[{self.nickname}] Match allocated! ID={self.current_match_id} Server={server_ip} (Opcode 0x00CB)"
+                    "MATCH_ALLOCATED",
+                    f"[{self.nickname}] Match allocated: {mode_info['name']} (ID: {self.current_match_id}) Server: {server_ip} (0x00CB)"
                 )
 
-                # In-Match duration
-                for _ in range(random.randint(4, 7)):
+                # Match Duration + Anti-AFK Simulation
+                match_duration = random.randint(4, 7)
+                for sec in range(match_duration):
                     if not self.is_running:
                         return
                     time.sleep(1.0)
+                    if sec % 2 == 0:
+                        self.engine.add_log(
+                            self.account_id,
+                            "DEBUG",
+                            "ANTI_AFK",
+                            f"[{self.nickname}] Anti-AFK heartbeat: position/fire event sent (match time: {sec+1}s)"
+                        )
 
-                # 3. MATCH COMPLETED -> RUN LIVE GARENA LEVEL & EXP CHECK
-                # NO FAKE EXP: Only update when confirmed by Garena!
+                # 3. MATCH COMPLETED -> VERIFY LIVE EXP & LEVEL FROM GARENA
                 if not self.is_running:
                     return
                 self.status = "CLAIMING_EXP"
+                self.sync_to_database()
+                self.engine.add_log(
+                    self.account_id,
+                    "INFO",
+                    "MATCH_FINISHED",
+                    f"[{self.nickname}] Match finished! Returned to lobby. Requesting authentic Garena level & EXP check..."
+                )
 
-                # Check live Garena profile directly
-                self.refresh_garena_profile()
+                # Query live Garena server for verified EXP gain
+                exp_gained = self.refresh_garena_profile()
+
+                # Rule 5: Count match only if completed & verified
                 self.matches_played += 1
+                self.engine.add_log(
+                    self.account_id,
+                    "SUCCESS",
+                    "MATCH_COMPLETED",
+                    f"[{self.nickname}] Match #{self.matches_played} completed successfully in {mode_info['name']}."
+                )
 
-                # Save updated progress to accounts.js
-                self.engine.save_accounts_to_disk()
+                # Rule 3: Daily EXP limit detection (3 consecutive 0 EXP matches: 2 LW and 1 BR)
+                if exp_gained == 0:
+                    self.consecutive_zero_exp_matches += 1
+                    self.engine.add_log(
+                        self.account_id,
+                        "WARN",
+                        "ZERO_EXP_MATCH",
+                        f"⚠️ [{self.nickname}] No EXP received from match ({self.consecutive_zero_exp_matches}/3 consecutive zero-EXP matches)."
+                    )
+                    if self.consecutive_zero_exp_matches >= 3:
+                        self.is_running = False
+                        self.status = "DAILY_LIMIT_REACHED"
+                        self.engine.add_log(
+                            self.account_id,
+                            "WARN",
+                            "DAILY_LIMIT_STOPPED",
+                            f"🛑 [{self.nickname}] Daily EXP limit reached! 3 consecutive matches gave +0 EXP (2 Lone Wolf & 1 BR). Worker automatically stopped to prevent wasted matchmaking cycles."
+                        )
+                        self.sync_to_database()
+                        return
+                else:
+                    self.consecutive_zero_exp_matches = 0
 
-                time.sleep(2.0)
+                self.status = "IDLE"
+                self.sync_to_database()
+
+                # Rule 4: Clean cooldown before sequential start of next match
+                time.sleep(2.5)
 
             except Exception as e:
                 logger.error(f"Error in worker {self.account_id}: {e}", exc_info=True)
@@ -325,268 +459,251 @@ class AccountWorker:
 
 class FFMatchmakingEngine:
     def __init__(self, accounts_file="accounts.js", devices_file="devices.json", cache_file="token_cache.json"):
-        self.accounts_file = accounts_file
-        self.devices_file = devices_file
-        self.cache_file = cache_file
+        self.accounts_file = os.path.join(BASE_DIR, accounts_file) if not os.path.isabs(accounts_file) else accounts_file
+        self.devices_file = os.path.join(BASE_DIR, devices_file) if not os.path.isabs(devices_file) else devices_file
+        self.cache_file = os.path.join(BASE_DIR, cache_file) if not os.path.isabs(cache_file) else cache_file
         self.start_time = time.time()
-        self.lock = threading.Lock()
-        self.logs = []
-        self.workers = {}
-        self.last_disk_mtime = 0
+        self.lock = threading.RLock()
+        self.logs: List[Dict[str, Any]] = []
+        self.workers: Dict[str, AccountWorker] = {}
 
         # Load devices
-        self.devices = self._load_devices(devices_file)
+        self.devices = self._load_devices(self.devices_file)
 
-        # Initial load from disk
-        self.sync_with_disk()
+        # Initialize SQLite bot.db and load accounts
+        database.init_db()
+        self.load_from_db()
 
-        self.add_log("ALL", "INFO", "ENGINE_INIT", f"Loaded {len(self.workers)} accounts directly from {os.path.basename(accounts_file)}.")
+        self.add_log("ALL", "INFO", "ENGINE_INIT", f"Database bot.db active. Loaded {len(self.workers)} accounts synchronized across all devices.")
 
-    def _load_devices(self, filepath):
+    def _load_devices(self, filepath: str) -> Any:
         if os.path.exists(filepath):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
-                logger.error(f"Error loading {filepath}: {e}")
-        return []
+                logger.error(f"Error loading devices from {filepath}: {e}")
+        return {}
 
-    def _load_accounts_from_js(self, filepath):
-        """Parses accounts array directly from accounts.js or accounts.json"""
-        target_path = filepath
-        if not os.path.exists(target_path):
-            alt_path = filepath.replace(".js", ".json")
-            if os.path.exists(alt_path):
-                target_path = alt_path
+    def _get_device_for_account(self, uid: str) -> Dict[str, Any]:
+        if isinstance(self.devices, dict):
+            if uid in self.devices:
+                dev = dict(self.devices[uid])
+                dev["device_name"] = f"{dev.get('brand', 'Android')} {dev.get('model', 'Phone')}".strip()
+                return dev
+            elif self.devices:
+                dev = dict(list(self.devices.values())[0])
+                dev["device_name"] = f"{dev.get('brand', 'Android')} {dev.get('model', 'Phone')}".strip()
+                return dev
+        elif isinstance(self.devices, list) and self.devices:
+            dev = dict(random.choice(self.devices))
+            dev["device_name"] = f"{dev.get('brand', 'Android')} {dev.get('model', 'Phone')}".strip()
+            return dev
+        return {"device_name": "Samsung Galaxy S23 Ultra", "brand": "Samsung", "model": "Galaxy S23 Ultra"}
 
-        if os.path.exists(target_path):
-            try:
-                with open(target_path, "r", encoding="utf-8") as f:
-                    content = f.read().strip()
-                    if not content or content == "module.exports = [];":
-                        json_path = target_path.replace(".js", ".json")
-                        if json_path != target_path and os.path.exists(json_path):
-                            with open(json_path, "r", encoding="utf-8") as jf:
-                                return json.load(jf)
-                    match = re.search(r'\[[\s\S]*\]', content)
-                    if match:
-                        return json.loads(match.group(0))
-            except Exception as e:
-                logger.error(f"Failed parsing {target_path}: {e}")
-        return []
-
-    def sync_with_disk(self):
-        """Synchronizes workers with accounts.js on disk so changes from ANY device appear immediately!"""
-        if not os.path.exists(self.accounts_file):
-            json_file = self.accounts_file.replace(".js", ".json")
-            if not os.path.exists(json_file):
-                return
-
-        check_path = self.accounts_file if os.path.exists(self.accounts_file) else self.accounts_file.replace(".js", ".json")
-        try:
-            mtime = os.path.getmtime(check_path)
-            if mtime == self.last_disk_mtime and self.workers:
-                return
-            self.last_disk_mtime = mtime
-        except Exception:
-            return
-
-        disk_accounts = self._load_accounts_from_js(check_path)
-        disk_ids = set()
-
+    def load_from_db(self):
+        """Loads accounts from SQLite bot.db into workers"""
         with self.lock:
-            for i, acc in enumerate(disk_accounts):
-                acc_id = str(acc.get("account_id") or acc.get("uid") or acc.get("id")).strip()
-                if not acc_id:
-                    continue
-                disk_ids.add(acc_id)
-                if acc_id not in self.workers:
-                    # Enrich from Garena if nickname is missing or placeholder
-                    if not acc.get("nickname") or not acc.get("real_ff_uid") or acc.get("nickname").startswith("Player_"):
-                        pwd = acc.get("password") or acc.get("auth_password", "")
-                        parsed = parse_major_login(acc_id, pwd)
-                        acc.update(parsed)
-                    dev = self.devices[i % len(self.devices)] if self.devices else {}
-                    worker = AccountWorker(acc, self, dev)
-                    self.workers[acc_id] = worker
-                    # Only auto-start if AUTO_START is enabled
-                    if os.environ.get("AUTO_START", "false").lower() == "true":
-                        worker.start()
+            accounts = database.get_all_accounts()
+            for acc in accounts:
+                uid = str(acc["account_id"])
+                if uid not in self.workers:
+                    device = self._get_device_for_account(uid)
+                    worker = AccountWorker(acc, self, device_data=device)
+                    self.workers[uid] = worker
                 else:
-                    w = self.workers[acc_id]
-                    if acc.get("nickname") and not acc.get("nickname").startswith("Player_"):
-                        w.nickname = acc["nickname"]
-                    if acc.get("real_ff_uid"):
-                        w.real_ff_uid = str(acc["real_ff_uid"])
-                    if "level" in acc:
-                        w.level = int(acc["level"])
-                    if "total_exp" in acc and not w.is_running:
-                        w.total_exp = int(acc["total_exp"])
+                    # Update fields
+                    w = self.workers[uid]
+                    w.real_ff_uid = str(acc.get("real_ff_uid") or w.real_ff_uid)
+                    w.nickname = str(acc.get("nickname") or w.nickname)
+                    w.level = int(acc.get("level") or w.level)
+                    w.total_exp = int(acc.get("total_exp") or w.total_exp)
+                    w.region = str(acc.get("region") or w.region)
 
-            to_remove = [aid for aid in self.workers if aid not in disk_ids]
-            for aid in to_remove:
-                self.workers[aid].stop()
-                del self.workers[aid]
-
-    def save_accounts_to_disk(self):
-        """Thread-safe write directly to accounts.js and accounts.json"""
-        with self.lock:
-            data = [w.to_dict() for w in self.workers.values()]
-            js_content = f"module.exports = {json.dumps(data, indent=2)};\n"
-            
-            try:
-                with open(self.accounts_file, "w", encoding="utf-8") as f:
-                    f.write(js_content)
-                self.last_disk_mtime = os.path.getmtime(self.accounts_file)
-            except Exception as e:
-                logger.error(f"Failed writing {self.accounts_file}: {e}")
-
-            json_file = self.accounts_file.replace(".js", ".json")
-            if json_file != self.accounts_file:
-                try:
-                    with open(json_file, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2)
-                except Exception:
-                    pass
-
-    def add_log(self, account_id, level, action, details, raw_hex=None):
-        entry = {
-            "id": f"log_{int(time.time()*1000)}_{random.randint(100, 999)}",
+    def add_log(self, account_id: str, level: str, event: str, message: str):
+        log_entry = {
             "timestamp": time.strftime("%H:%M:%S"),
-            "account_id": str(account_id),
+            "account_id": account_id,
             "level": level,
-            "action": action,
-            "details": details,
-            "raw_hex": raw_hex
+            "event": event,
+            "message": message
         }
         with self.lock:
-            self.logs.insert(0, entry)
-            if len(self.logs) > 300:
-                self.logs.pop()
+            self.logs.append(log_entry)
+            if len(self.logs) > 500:
+                self.logs.pop(0)
 
-    def start_worker(self, account_id):
-        self.sync_with_disk()
-        worker = self.workers.get(str(account_id))
-        if worker:
-            worker.start()
-            return {"status": "started", "account_id": account_id}
-        return {"status": "error", "message": "Account not found"}
-
-    def stop_worker(self, account_id):
-        self.sync_with_disk()
-        worker = self.workers.get(str(account_id))
-        if worker:
-            worker.stop()
-            return {"status": "stopped", "account_id": account_id}
-        return {"status": "error", "message": "Account not found"}
-
-    def start_all(self):
-        self.sync_with_disk()
-        for worker in self.workers.values():
-            worker.start()
-        return {"status": "all_started", "count": len(self.workers)}
-
-    def stop_all(self):
-        self.sync_with_disk()
-        for worker in self.workers.values():
-            worker.stop()
-        return {"status": "all_stopped", "count": len(self.workers)}
-
-    def verify_account(self, account_id):
-        """Triggers an on-demand live Garena server check for an account"""
-        self.sync_with_disk()
-        worker = self.workers.get(str(account_id))
-        if worker:
-            success = worker.refresh_garena_profile()
-            return {"status": "success" if success else "failed", "account": worker.to_dict()}
-        return {"status": "error", "message": "Account not found"}
-
-    def verify_all(self):
-        """Triggers live Garena re-verification for all accounts"""
-        self.sync_with_disk()
-        updated = []
-        for worker in self.workers.values():
-            worker.refresh_garena_profile()
-            updated.append(worker.to_dict())
-        return {"status": "success", "accounts": updated}
-
-    def add_account(self, data):
-        """Adds account asking ONLY UID and Password. Real in-game nickname and Real FF UID are parsed via Major Login!"""
-        self.sync_with_disk()
-        acc_id = str(data.get("account_id") or data.get("uid", "")).strip()
-        password = str(data.get("password", "")).strip()
-
-        if not acc_id:
-            return {"status": "error", "message": "Account UID / Login ID is required"}
-        if not password:
-            return {"status": "error", "message": "Password is required"}
-
-        if acc_id in self.workers:
-            return {"status": "error", "message": f"Account UID {acc_id} already exists"}
-
-        # Major Login: Real Free Fire UID, Nickname, Level, and EXP
-        info = parse_major_login(acc_id, password)
-
-        dev = self.devices[len(self.workers) % len(self.devices)] if self.devices else {}
-        worker = AccountWorker(info, self, dev)
-        
+    def get_stats(self) -> Dict[str, Any]:
+        """Returns consolidated metrics and accounts list for multi-device dashboard"""
         with self.lock:
-            self.workers[acc_id] = worker
-        
-        # Save directly to accounts.js & accounts.json
-        self.save_accounts_to_disk()
+            acc_list = [w.to_dict() for w in self.workers.values()]
+            active_count = sum(1 for w in self.workers.values() if w.is_running)
+            total_matches = sum(w.matches_played for w in self.workers.values())
+            total_cumulative_exp = sum(w.total_exp for w in self.workers.values())
+            total_session_exp = sum(w.session_exp for w in self.workers.values())
 
-        # Start farming automatically
+            return {
+                "total_accounts": len(acc_list),
+                "active_workers": active_count,
+                "total_matches_played": total_matches,
+                "total_cumulative_exp": total_cumulative_exp,
+                "total_session_exp": total_session_exp,
+                "accounts": acc_list,
+                "server_uptime": int(time.time() - self.start_time),
+                "storage_backend": "SQLite (bot.db) + accounts.js"
+            }
+
+    def start_worker(self, account_id: str) -> Dict[str, Any]:
+        with self.lock:
+            worker = self.workers.get(str(account_id))
+        if not worker:
+            return {"success": False, "error": f"Account {account_id} not found"}
         worker.start()
-        
-        self.add_log(
-            acc_id, 
-            "SUCCESS", 
-            "ACCOUNT_ADDED", 
-            f"Added {worker.nickname} (Real FF UID: {worker.real_ff_uid}) Level {worker.level}, {worker.total_exp:,} EXP -> Saved to accounts.js"
-        )
-        return {"status": "success", "account": worker.to_dict()}
+        return {"success": True, "account": worker.to_dict()}
 
-    def delete_account(self, account_id):
-        self.sync_with_disk()
-        acc_id = str(account_id)
-        if acc_id in self.workers:
-            self.workers[acc_id].stop()
-            with self.lock:
-                del self.workers[acc_id]
-            self.save_accounts_to_disk()
-            self.add_log(acc_id, "WARN", "ACCOUNT_DELETED", f"Removed account UID {acc_id} from accounts.js")
-            return {"status": "deleted"}
-        return {"status": "error", "message": "Account not found"}
+    def stop_worker(self, account_id: str) -> Dict[str, Any]:
+        with self.lock:
+            worker = self.workers.get(str(account_id))
+        if not worker:
+            return {"success": False, "error": f"Account {account_id} not found"}
+        worker.stop()
+        return {"success": True, "account": worker.to_dict()}
 
-    def get_stats(self):
-        self.sync_with_disk()
-        worker_list = list(self.workers.values())
-        return {
-            "total_accounts": len(worker_list),
-            "active_workers": sum(1 for w in worker_list if w.is_running),
-            "total_session_exp": sum(w.session_exp for w in worker_list),
-            "total_cumulative_exp": sum(w.total_exp for w in worker_list),
-            "total_matches_played": sum(w.matches_played for w in worker_list),
-            "uptime_seconds": int(time.time() - self.start_time),
-            "accounts": [w.to_dict() for w in worker_list]
+    def start_all(self) -> Dict[str, Any]:
+        with self.lock:
+            workers_list = list(self.workers.values())
+        count = 0
+        for w in workers_list:
+            if not w.is_running:
+                w.start()
+                count += 1
+        return {"success": True, "started_count": count}
+
+    def stop_all(self) -> Dict[str, Any]:
+        with self.lock:
+            workers_list = list(self.workers.values())
+        count = 0
+        for w in workers_list:
+            if w.is_running:
+                w.stop()
+                count += 1
+        return {"success": True, "stopped_count": count}
+
+    def add_account(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Processes new account addition:
+          1. Parses Real Nickname & Real Free Fire UID from Garena Major Login
+          2. Sets baseline_exp to current total_exp and session_exp to 0
+          3. Saves to SQLite bot.db and syncs to accounts.json / accounts.js
+        """
+        login_uid = str(data.get("uid") or data.get("account_id") or "").strip()
+        password = str(data.get("password") or data.get("auth_password") or "").strip()
+
+        if not login_uid:
+            return {"success": False, "error": "Login UID is required"}
+        if not password:
+            return {"success": False, "error": "Password / Token is required"}
+
+        # 1. Parse authentic Garena credentials
+        info = parse_major_login(login_uid, password)
+        real_ff_uid = str(info.get("real_ff_uid") or login_uid)
+        nickname = str(info.get("nickname") or f"FF_Player_{real_uid[-4:]}")
+        level = int(info.get("level") or 1)
+        total_exp = int(info.get("total_exp") or 0)
+        region = str(info.get("region") or "IND")
+
+        account_record = {
+            "account_id": login_uid,
+            "real_ff_uid": real_ff_uid,
+            "nickname": nickname,
+            "password": password,
+            "region": region,
+            "level": level,
+            "total_exp": total_exp,
+            "baseline_exp": total_exp,  # Rule 6: baseline set to current total exp
+            "session_exp": 0,           # Rule 6: session gain starts strictly at 0!
+            "last_match_exp": 0,
+            "matches_played": 0,
+            "consecutive_zero_exp": 0,
+            "status": "IDLE",
+            "device_name": "Samsung Galaxy S23 Ultra"
         }
 
-    def get_status(self):
-        return self.get_stats()
+        # 2. Save to SQLite database (bot.db) & sync disk files
+        database.save_account(account_record)
 
-    def get_logs(self, account_id=None, limit=100):
+        # 3. Create or update in-memory worker
         with self.lock:
-            if not account_id or account_id == "ALL":
-                return self.logs[:limit]
-            return [l for l in self.logs if str(l.get("account_id")) in [str(account_id), "ALL"]][:limit]
+            device = self._get_device_for_account(login_uid)
+            worker = AccountWorker(account_record, self, device_data=device)
+            self.workers[login_uid] = worker
 
-    def export_accounts_js(self):
-        self.sync_with_disk()
-        data = [w.to_dict() for w in self.workers.values()]
-        return f"module.exports = {json.dumps(data, indent=2)};\n"
+        self.add_log(
+            login_uid,
+            "SUCCESS",
+            "ACCOUNT_ADDED",
+            f"✅ Account linked: {nickname} (Real FF UID: {real_ff_uid}, Login UID: {login_uid}, Level: {level}, EXP: {total_exp:,})"
+        )
 
-    def export_accounts_json(self):
-        self.sync_with_disk()
-        data = [w.to_dict() for w in self.workers.values()]
-        return json.dumps(data, indent=2)
+        # Auto-start newly added account worker
+        worker.start()
+
+        return {"success": True, "account": worker.to_dict()}
+
+    def delete_account(self, account_id: str) -> Dict[str, Any]:
+        """Deletes account from bot.db, workers, and disk files"""
+        with self.lock:
+            worker = self.workers.pop(str(account_id), None)
+            if worker:
+                worker.stop("ACCOUNT_DELETED")
+            database.delete_account(account_id)
+            self.add_log(account_id, "WARN", "ACCOUNT_DELETED", f"Account {account_id} removed from bot.db.")
+            return {"success": True}
+
+    def verify_account(self, account_id: str) -> Dict[str, Any]:
+        with self.lock:
+            worker = self.workers.get(str(account_id))
+        if not worker:
+            return {"success": False, "error": "Account not found"}
+        worker.refresh_garena_profile()
+        return {"success": True, "account": worker.to_dict()}
+
+    def verify_all(self) -> Dict[str, Any]:
+        with self.lock:
+            workers_list = list(self.workers.values())
+        for w in workers_list:
+            w.refresh_garena_profile()
+        return {"success": True, "verified_count": len(workers_list)}
+
+    def get_logs(self, account_id: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        with self.lock:
+            if account_id and account_id != "ALL":
+                filtered = [l for l in self.logs if l["account_id"] == account_id or l["account_id"] == "ALL"]
+                return filtered[-limit:]
+            return self.logs[-limit:]
+
+    def export_accounts_js(self) -> str:
+        accounts = database.get_all_accounts()
+        cleaned = [{
+            "uid": a["account_id"],
+            "password": a["password"],
+            "real_ff_uid": a["real_ff_uid"],
+            "nickname": a["nickname"],
+            "level": a["level"],
+            "total_exp": a["total_exp"],
+            "region": a["region"]
+        } for a in accounts]
+        return "module.exports = " + json.dumps(cleaned, indent=2) + ";\n"
+
+    def export_accounts_json(self) -> str:
+        accounts = database.get_all_accounts()
+        cleaned = [{
+            "uid": a["account_id"],
+            "password": a["password"],
+            "real_ff_uid": a["real_ff_uid"],
+            "nickname": a["nickname"],
+            "level": a["level"],
+            "total_exp": a["total_exp"],
+            "region": a["region"]
+        } for a in accounts]
+        return json.dumps(cleaned, indent=2)

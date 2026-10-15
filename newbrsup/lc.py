@@ -2250,6 +2250,9 @@ async def play_game(server_ip_port, thunder, sharma, udp_key, match_code,
 
 
 # ==================== FUNCTIONAL WORKER ====================
+_account_rotations: Dict[str, int] = {}
+_account_consecutive_zero_exp: Dict[str, int] = {}
+
 async def functional_lone_wolf(addrs, starter_packet, account_region, client_version,
                                 key, iv, account_id="", account_data=None,
                                 max_reconnects=10):
@@ -2285,7 +2288,18 @@ async def functional_lone_wolf(addrs, starter_packet, account_region, client_ver
                     current_level = int(current_account_data.get('level', 1) or 1)
                 except Exception:
                     current_level = 1
-            is_lone_wolf = (current_level >= LONE_WOLF_UNLOCK_LEVEL)
+
+            # Rule 1 & Rule 2:
+            # If level < 3: strictly Battle Royale (never Lone Wolf)
+            # If level >= 3: mixed rotation (2 Lone Wolf : 1 Battle Royale)
+            if current_level < 3:
+                is_lone_wolf = False
+                mode_desc = "BATTLE ROYALE (Level < 3)"
+            else:
+                rot = _account_rotations.get(uid_str, 0)
+                is_lone_wolf = (rot % 3 < 2)
+                mode_desc = f"LONE WOLF 🐺 ({rot % 3 + 1}/2)" if is_lone_wolf else "BATTLE ROYALE 🪂 (1/1)"
+
 
             writer = None
             gateway_ping_task = None
@@ -2560,7 +2574,56 @@ async def functional_lone_wolf(addrs, starter_packet, account_region, client_ver
                                 squad_manager.unregister(uid_str)
                                 await safe_close_writer(writer)
                                 writer = None
-                                print_info(f"[OFFLINE] Match #{match_index} concluded. Next search in {NEW_MATCH_DELAY}s...")
+                                print_info(f"[OFFLINE] Match #{match_index} concluded ({mode_tag}). Requesting live Garena EXP verification...")
+
+                                # Rule 5: Increment mixed rotation counter
+                                _account_rotations[uid_str] = _account_rotations.get(uid_str, 0) + 1
+
+                                # Rule 3 & Rule 6: Real Post-match Garena Check (No Fake EXP!)
+                                old_exp = bot_state.accounts.get(effective_acc_id, {}).get("current_exp", 0) or bot_state.accounts.get(uid_str, {}).get("current_exp", 0)
+                                try:
+                                    await refresh_account_profile(effective_acc_id or uid_str)
+                                except Exception as e:
+                                    print_warning(f"[!] Profile check notice: {e}")
+
+                                new_exp = bot_state.accounts.get(effective_acc_id, {}).get("current_exp", 0) or bot_state.accounts.get(uid_str, {}).get("current_exp", 0)
+                                new_lvl = bot_state.accounts.get(effective_acc_id, {}).get("level", 1) or bot_state.accounts.get(uid_str, {}).get("level", 1)
+                                exp_gain = max(0, new_exp - old_exp) if (new_exp and old_exp) else 0
+
+                                # Update SQLite bot.db persistent database
+                                try:
+                                    import database
+                                    database.update_account_stats(
+                                        account_id=uid_str,
+                                        level=new_lvl,
+                                        total_exp=new_exp,
+                                        last_match_exp=exp_gain,
+                                        session_exp=bot_state.accounts.get(effective_acc_id, {}).get("gained_exp", 0),
+                                        matches_played=match_index,
+                                        consecutive_zero_exp=_account_consecutive_zero_exp.get(uid_str, 0),
+                                        status="ONLINE"
+                                    )
+                                except Exception:
+                                    pass
+
+                                # Rule 3: Stop if 3 consecutive matches give 0 EXP
+                                if exp_gain == 0:
+                                    _account_consecutive_zero_exp[uid_str] = _account_consecutive_zero_exp.get(uid_str, 0) + 1
+                                    z_cnt = _account_consecutive_zero_exp[uid_str]
+                                    print_warning(f"[!] Match gave +0 EXP ({z_cnt}/3 consecutive zero-EXP matches)")
+                                    if z_cnt >= 3:
+                                        print_error(f"[🛑] Daily EXP limit reached for UID {uid_str}! (3 consecutive matches gave +0 EXP: 2 Lone Wolf & 1 BR)")
+                                        print_warning(f"[🛑] Stopping script for UID {uid_str} because daily EXP limit is reached.")
+                                        try:
+                                            bot_state.update_status(uid_str, "DAILY_LIMIT_REACHED", 0)
+                                            bot_state.pause(uid_str)
+                                        except Exception:
+                                            pass
+                                        break
+                                else:
+                                    _account_consecutive_zero_exp[uid_str] = 0
+                                    print_success(f"[🏆] Verified Garena EXP gain: +{exp_gain:,} EXP! Current Total: {new_exp:,} EXP (Level {new_lvl})")
+
                                 try:
                                     bot_state.update_status(uid_str, f"ONLINE ({mode_tag})", 0)
                                 except Exception:
@@ -2568,6 +2631,7 @@ async def functional_lone_wolf(addrs, starter_packet, account_region, client_ver
                                 await asyncio.sleep(NEW_MATCH_DELAY)
                                 reconnects = 0
                                 break
+
                             else:
                                 print_info(f"[FUNCTIONAL] Configuration packet received ({packet_length}B), maintaining queue...")
                                 continue

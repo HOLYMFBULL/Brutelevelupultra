@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Free Fire Parallel Studio · 24/7 Background EXP Farm</title>
-  <meta name="description" content="Multi-account parallel Free Fire matchmaking worker and cyber glassmorphism web dashboard with real-time Garena EXP tracking.">
+  <title>Free Fire Parallel Studio</title>
+  <meta name="description" content="24/7 background matchmaking, level-based mode selection, anti-AFK, and real-time Garena EXP verification dashboard">
+  <meta property="og:title" content="Free Fire Parallel Studio">
+  <meta property="og:description" content="24/7 background matchmaking, level-based mode selection, anti-AFK, and real-time Garena EXP verification dashboard">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -54,13 +56,13 @@
     }
 
     .glass-header {
-      background: rgba(2, 6, 23, 0.82);
+      background: rgba(2, 6, 23, 0.88);
       backdrop-filter: blur(28px);
       -webkit-backdrop-filter: blur(28px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
     .glass-panel {
-      background: rgba(15, 23, 42, 0.65);
+      background: rgba(15, 23, 42, 0.70);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -76,7 +78,7 @@
     .glass-card:hover {
       border-color: rgba(56, 189, 248, 0.45);
       box-shadow: 0 16px 45px -10px rgba(6, 182, 212, 0.25);
-      transform: translateY(-3px);
+      transform: translateY(-2px);
     }
 
     .text-glow-emerald { text-shadow: 0 0 20px rgba(52, 211, 153, 0.6); }
@@ -101,13 +103,13 @@
       
       <!-- Brand & Status -->
       <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 via-sky-600 to-amber-500 p-0.5 shadow-xl shadow-cyan-500/25">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 via-sky-600 to-amber-500 p-0.5 shadow-xl shadow-cyan-500/25 shrink-0">
           <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-cyan-400 font-extrabold font-mono text-base tracking-tighter">
             FF
           </div>
         </div>
         <div>
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2.5 flex-wrap">
             <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
               Free Fire Parallel Studio
             </h1>
@@ -117,7 +119,7 @@
             </span>
           </div>
           <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-mono">
-            <span class="text-cyan-400">Syncs live with accounts.js</span>
+            <span class="text-cyan-400">Database: SQLite (bot.db)</span>
             <span>·</span>
             <span id="header-active-count" class="text-emerald-400 font-bold">0 Active Parallel Threads</span>
           </p>
@@ -125,9 +127,9 @@
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+      <div class="flex flex-wrap items-center gap-2">
         <button onclick="startAll()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-mono font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
-          <span>▶</span> Start All Workers
+          <span>▶</span> Start All
         </button>
 
         <button onclick="stopAll()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 font-mono font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
@@ -135,16 +137,24 @@
         </button>
 
         <button onclick="verifyAll()" title="Re-check Garena live servers for all accounts" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 font-mono font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
-          <span>🔄</span> Re-verify Profiles
+          <span>🔄</span> Re-check EXP
         </button>
 
         <button onclick="openModal()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-mono font-extrabold text-xs shadow-lg shadow-cyan-500/25 flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
-          <span>+</span> Add Account (UID & Pass)
+          <span>+</span> Add Account
         </button>
 
-        <a href="/api/accounts/export/js" download="accounts.js" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 border border-white/10 font-mono font-bold text-xs flex items-center gap-1.5 transition cursor-pointer">
-          <span>📥</span> accounts.js
-        </a>
+        <div class="flex items-center gap-1 bg-slate-900/90 border border-white/10 rounded-xl p-0.5">
+          <a href="/api/accounts/export/db" download="bot.db" title="Download SQLite database backup" class="px-2.5 py-1.5 text-slate-300 hover:text-cyan-300 text-[11px] font-mono font-bold flex items-center gap-1 transition">
+            <span>💾</span> bot.db
+          </a>
+          <a href="/api/accounts/export/js" download="accounts.js" title="Download accounts.js file" class="px-2.5 py-1.5 text-slate-300 hover:text-cyan-300 text-[11px] font-mono font-bold flex items-center gap-1 transition border-l border-white/10">
+            <span>📥</span> accounts.js
+          </a>
+          <button onclick="openImportModal()" title="Import accounts or restore backup" class="px-2.5 py-1.5 text-slate-300 hover:text-amber-300 text-[11px] font-mono font-bold flex items-center gap-1 transition border-l border-white/10 cursor-pointer">
+            <span>📤</span> Import
+          </button>
+        </div>
       </div>
 
     </div>
@@ -153,25 +163,55 @@
   <!-- Main Content Layout -->
   <main class="max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-6 flex-1">
 
-    <!-- 24/7 Multi-Device Sync Banner -->
-    <div class="glass-panel rounded-3xl p-4 sm:p-5 border border-cyan-500/25 relative overflow-hidden bg-gradient-to-r from-slate-950/90 via-slate-900/80 to-slate-950/90 shadow-xl">
+    <!-- Multi-Device Persistent DB Banner -->
+    <div class="glass-panel rounded-3xl p-4 sm:p-5 border border-cyan-500/30 relative overflow-hidden bg-gradient-to-r from-slate-950/90 via-slate-900/80 to-slate-950/90 shadow-xl">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
         <div class="space-y-1">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
             <h2 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
-              ⚡ 24/7 Multi-Device Headless Background Farm Active
+              ⚡ Multi-Device SQLite Persistence (bot.db) & Live Garena Engine
             </h2>
           </div>
           <p class="text-xs text-slate-300 leading-relaxed font-sans max-w-3xl">
-            The bot runs 24/7 directly on the server daemon. All accounts added on <strong>any device</strong> are automatically saved to <code class="text-cyan-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">accounts.js</code> and synced in real time across phones, laptops, and PCs. EXP is strictly verified from Garena with <strong>zero fake math</strong>.
+            Accounts added from <strong>any phone, tablet, or PC</strong> are permanently stored in server database <code class="text-cyan-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">bot.db</code> and synced across all devices in real time. EXP updates strictly via <strong>post-match Garena verification</strong> (no fake increment).
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <span class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-xs font-mono text-cyan-300 font-bold flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            Disk Sync: <strong class="text-white">accounts.js</strong>
+          <span class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-300 font-bold flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Live Multi-Device Sync: <strong class="text-white">ACTIVE</strong>
           </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Rules & Logic Guide -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+      <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-sky-500/20 space-y-1">
+        <div class="text-sky-300 font-bold flex items-center gap-1.5">
+          <span>🪂</span> Level &lt; 3 Rule
+        </div>
+        <div class="text-slate-400 text-[11px] font-sans">
+          Accounts below Level 3 strictly play <strong>BATTLE ROYALE ONLY</strong> (mode_id=1, map_id=1). Lone Wolf is never queued.
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-amber-500/20 space-y-1">
+        <div class="text-amber-300 font-bold flex items-center gap-1.5">
+          <span>🐺</span> Level &ge; 3 Mixed Rule
+        </div>
+        <div class="text-slate-400 text-[11px] font-sans">
+          Accounts Level 3+ play mixed rotation: <strong>2 Lone Wolf Solo matches : 1 Battle Royale match</strong> sequentially.
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-red-500/20 space-y-1">
+        <div class="text-red-300 font-bold flex items-center gap-1.5">
+          <span>🛑</span> Daily EXP Limit Guard
+        </div>
+        <div class="text-slate-400 text-[11px] font-sans">
+          If <strong>3 consecutive matches</strong> (2 LW & 1 BR) yield +0 verified EXP, the worker automatically pauses to avoid wasted matches.
         </div>
       </div>
     </div>
@@ -182,11 +222,11 @@
       <!-- Metric 1: Accounts -->
       <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-1.5 border border-cyan-500/20">
         <div class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center justify-between">
-          <span>Accounts in accounts.js</span>
+          <span>Accounts in bot.db</span>
           <span class="text-cyan-400 text-sm">👥</span>
         </div>
         <div id="stat-accounts" class="text-2xl sm:text-3xl font-extrabold text-white font-mono tabular-nums">0</div>
-        <div class="text-[11px] text-cyan-400/90 font-mono">Synced across all devices</div>
+        <div class="text-[11px] text-cyan-400/90 font-mono">Synced on all devices</div>
       </div>
 
       <!-- Metric 2: Active Workers -->
@@ -202,17 +242,17 @@
       <!-- Metric 3: Total Matches -->
       <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-1.5 border border-amber-500/20">
         <div class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center justify-between">
-          <span>Matches Completed</span>
+          <span>Completed Matches</span>
           <span class="text-amber-400 text-sm">🏆</span>
         </div>
         <div id="stat-matches" class="text-2xl sm:text-3xl font-extrabold text-amber-300 font-mono tabular-nums text-glow-amber">0</div>
-        <div class="text-[11px] text-amber-400/90 font-mono">Live matches tracked</div>
+        <div class="text-[11px] text-amber-400/90 font-mono">Verified finished games</div>
       </div>
 
       <!-- Metric 4: Verified Total EXP -->
       <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-1.5 border border-sky-500/20">
         <div class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center justify-between">
-          <span>Total Verified EXP</span>
+          <span>Total Account EXP</span>
           <span class="text-cyan-400 text-sm">✨</span>
         </div>
         <div id="stat-total-exp" class="text-2xl sm:text-3xl font-extrabold text-cyan-300 font-mono tabular-nums text-glow-cyan">0 EXP</div>
@@ -228,12 +268,12 @@
           <span>👥</span> Bot Accounts (<span id="tab-accounts-badge">0</span>)
         </button>
         <button id="btn-tab-logs" onclick="setTab('logs')" class="px-5 py-3 text-slate-400 hover:text-slate-200 cursor-pointer transition font-bold flex items-center gap-2">
-          <span>⚡</span> Parallel Socket Feed
+          <span>⚡</span> Live Socket Protocol Feed
         </button>
       </div>
 
       <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-400">
-        <span>Auto-refresh:</span>
+        <span>Device Sync:</span>
         <span class="text-emerald-400 font-bold">LIVE (2s)</span>
       </div>
     </div>
@@ -243,7 +283,7 @@
       <div id="accounts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- Injected via JavaScript -->
         <div class="col-span-full py-16 text-center text-slate-500 font-mono text-xs">
-          Loading accounts from accounts.js...
+          Loading accounts from SQLite bot.db...
         </div>
       </div>
     </div>
@@ -263,13 +303,13 @@
       </div>
 
       <div id="logs-stream" class="glass-panel rounded-2xl p-5 font-mono text-xs space-y-2.5 h-[540px] overflow-y-auto border border-white/10 bg-slate-950/80">
-        <div class="text-slate-600 italic">Connecting to parallel account stream...</div>
+        <div class="text-slate-600 italic">Connecting to live account protocol feed...</div>
       </div>
     </div>
 
   </main>
 
-  <!-- Add Account Modal (Only UID and Password as explicitly requested!) -->
+  <!-- Add Account Modal -->
   <div id="add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
     <div class="w-full max-w-md glass-panel rounded-3xl p-6 sm:p-7 space-y-4 border border-cyan-500/40 shadow-2xl relative">
       <div class="flex items-center justify-between">
@@ -278,7 +318,7 @@
             <span>➕</span> Add Free Fire Account
           </h3>
           <p class="text-xs text-slate-400">
-            Only UID and Password required. Real In-Game Name & Real FF UID are automatically fetched from Garena.
+            Provide Guest Login UID and Password. Real Name and Real FF UID are automatically extracted from Garena.
           </p>
         </div>
         <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">✕</button>
@@ -287,26 +327,26 @@
       <form onsubmit="handleAddAccount(event)" class="space-y-4 font-mono text-xs">
         <div>
           <label class="block text-slate-300 font-sans font-bold text-xs mb-1.5">
-            UID / Guest Login ID *
+            Guest Login UID *
           </label>
           <input type="text" id="input-uid" required placeholder="e.g. 8164540713" class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm font-mono">
-          <span class="text-[10px] text-slate-400 mt-1 block">Your Garena login ID / Guest UID</span>
+          <span class="text-[10px] text-slate-400 mt-1 block">Your Guest Login UID from Garena</span>
         </div>
 
         <div>
           <label class="block text-slate-300 font-sans font-bold text-xs mb-1.5">
-            Password / Token *
+            Password Hash / Token *
           </label>
-          <input type="password" id="input-password" required placeholder="e.g. 5ECCDAC9565614AD4919F9E97E761D71..." class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm font-mono">
-          <span class="text-[10px] text-slate-400 mt-1 block">Guest auth password key or token</span>
+          <input type="password" id="input-password" required placeholder="e.g. FD84FECCCEF1AA4C84D1F2C0DA94EF..." class="w-full bg-slate-950/90 border border-white/15 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 text-sm font-mono">
+          <span class="text-[10px] text-slate-400 mt-1 block">Guest auth password string or token</span>
         </div>
 
         <div class="p-3.5 rounded-2xl bg-cyan-950/30 border border-cyan-500/25 text-[11px] text-cyan-300 leading-relaxed font-sans space-y-1">
           <div class="font-bold flex items-center gap-1.5">
-            <span>🛡️</span> Authentic Major Login Extraction
+            <span>🛡️</span> Garena Major Login Extraction
           </div>
           <div>
-            The server authenticates directly with Garena to query your <strong>Real Free Fire UID</strong>, <strong>Character Nickname</strong>, and <strong>Verified Level & EXP</strong>. It immediately appends to <code class="text-white font-mono bg-slate-900 px-1 rounded">accounts.js</code>!
+            The server queries Garena directly to fetch your <strong>Real Free Fire numeric UID</strong>, <strong>Character Nickname</strong>, and <strong>Verified Level & EXP</strong>, storing it in SQLite <code class="text-white font-mono bg-slate-900 px-1 rounded">bot.db</code>!
           </div>
         </div>
 
@@ -317,7 +357,45 @@
             Cancel
           </button>
           <button type="submit" id="btn-submit-add" class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/25 transition cursor-pointer flex items-center gap-1.5">
-            <span>⚡</span> Save & Start Farming
+            <span>⚡</span> Save & Link Account
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import Accounts Modal -->
+  <div id="import-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+    <div class="w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-7 space-y-4 border border-amber-500/40 shadow-2xl relative">
+      <div class="flex items-center justify-between">
+        <div class="space-y-0.5">
+          <h3 class="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
+            <span>📤</span> Import / Restore Accounts
+          </h3>
+          <p class="text-xs text-slate-400">
+            Paste JSON or accounts array to bulk import accounts into SQLite bot.db.
+          </p>
+        </div>
+        <button onclick="closeImportModal()" class="w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">✕</button>
+      </div>
+
+      <form onsubmit="handleImportAccounts(event)" class="space-y-4 font-mono text-xs">
+        <div>
+          <label class="block text-slate-300 font-sans font-bold text-xs mb-1.5">
+            Paste Accounts JSON or Array:
+          </label>
+          <textarea id="input-import-json" rows="7" required placeholder='[&#10;  { "uid": "8164540713", "password": "FD84FECCCEF1..." }&#10;]' class="w-full bg-slate-950/90 border border-white/15 rounded-xl p-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 font-mono text-xs"></textarea>
+        </div>
+
+        <div id="import-error" class="hidden p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs"></div>
+        <div id="import-success" class="hidden p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs"></div>
+
+        <div class="flex items-center justify-end gap-3 pt-1 font-sans">
+          <button type="button" onclick="closeImportModal()" class="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-white cursor-pointer">
+            Close
+          </button>
+          <button type="submit" id="btn-submit-import" class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/25 transition cursor-pointer flex items-center gap-1.5">
+            <span>⚡</span> Import into bot.db
           </button>
         </div>
       </form>
@@ -360,6 +438,16 @@
       document.getElementById('add-modal').classList.add('hidden');
     }
 
+    function openImportModal() {
+      document.getElementById('import-modal').classList.remove('hidden');
+      document.getElementById('import-error').classList.add('hidden');
+      document.getElementById('import-success').classList.add('hidden');
+    }
+
+    function closeImportModal() {
+      document.getElementById('import-modal').classList.add('hidden');
+    }
+
     async function fetchStatus() {
       if (isFetching) return;
       isFetching = true;
@@ -388,7 +476,7 @@
           const curVal = select.value;
           let opt = '<option value="ALL">⚡ All Accounts (Combined Parallel Feed)</option>';
           accounts.forEach(a => {
-            opt += `<option value="${a.account_id}" ${curVal == a.account_id ? 'selected' : ''}>${a.nickname} (FF UID: ${a.real_ff_uid || a.account_id})</option>`;
+            opt += `<option value="${a.account_id}" ${curVal == a.account_id ? 'selected' : ''}>${a.nickname} (Real FF UID: ${a.real_ff_uid || a.account_id})</option>`;
           });
           select.innerHTML = opt;
         }
@@ -407,7 +495,7 @@
         container.innerHTML = `
           <div class="col-span-full text-center py-16 glass-panel rounded-3xl border border-white/5 space-y-3">
             <div class="text-4xl">🎮</div>
-            <div class="text-base font-extrabold text-white">No accounts found in accounts.js</div>
+            <div class="text-base font-extrabold text-white">No accounts found in bot.db</div>
             <div class="text-xs text-slate-400">Click "+ Add Account" to link your Free Fire UID & Password.</div>
           </div>
         `;
@@ -427,27 +515,31 @@
         } else if (a.status === 'CLAIMING_EXP') {
           statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>GARENA VERIFY</span>';
           cardBorder = 'border-cyan-500/50 shadow-cyan-950/30';
+        } else if (a.status === 'DAILY_LIMIT_REACHED') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>🛑 DAILY EXP LIMIT</span>';
+          cardBorder = 'border-amber-500/50 shadow-amber-950/30';
         }
 
+        // Rule 1: Level < 3 strictly BR. Rule 2: Level >= 3 mixed 2 LW : 1 BR
         const modeBadge = a.level >= 3 
-          ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30">🐺 LONE WOLF SOLO</span>'
-          : '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-extrabold bg-sky-500/15 text-sky-300 border border-sky-500/30">🪂 BATTLE ROYALE</span>';
+          ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30">🐺 LONE WOLF + 🪂 BR (2 LW : 1 BR)</span>'
+          : '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-extrabold bg-sky-500/15 text-sky-300 border border-sky-500/30">🪂 BATTLE ROYALE ONLY (Lvl &lt; 3)</span>';
 
         return `
           <div class="glass-card rounded-3xl p-5 sm:p-6 space-y-4 ${cardBorder}">
             
-            <!-- Top Header: Nickname & Badges -->
+            <!-- Top Header: Authentic Nickname & Badges -->
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500/30 to-emerald-500/30 border border-white/20 flex items-center justify-center font-extrabold text-base text-cyan-300 font-mono shadow-md">
-                  ${(a.nickname || 'P').charAt(0).toUpperCase()}
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500/30 to-emerald-500/30 border border-white/20 flex items-center justify-center font-extrabold text-base text-cyan-300 font-mono shadow-md shrink-0">
+                  ${(a.nickname || 'F').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <h3 class="text-base font-extrabold text-white tracking-tight">${a.nickname}</h3>
                     <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">${a.region || 'IND'}</span>
                   </div>
-                  <div class="text-[11px] font-mono text-cyan-300 mt-0.5 flex items-center gap-1.5">
+                  <div class="text-[11px] font-mono text-cyan-300 mt-0.5 flex items-center gap-1.5 flex-wrap">
                     <span>Real FF UID:</span>
                     <strong class="text-white">${a.real_ff_uid || a.account_id}</strong>
                   </div>
@@ -456,11 +548,11 @@
                   </div>
                 </div>
               </div>
-              <div>${statusBadge}</div>
+              <div class="shrink-0">${statusBadge}</div>
             </div>
 
             <!-- Mode & Level Bar -->
-            <div class="flex items-center justify-between pt-1">
+            <div class="flex items-center justify-between pt-1 gap-2 flex-wrap">
               ${modeBadge}
               <span class="text-cyan-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 font-mono">
                 Level ${a.level}
@@ -473,7 +565,7 @@
               <!-- Progress Bar -->
               <div class="space-y-1.5">
                 <div class="flex justify-between text-[11px]">
-                  <span class="text-slate-400">To Level ${a.level + 1}</span>
+                  <span class="text-slate-400">Level ${a.level} Progress</span>
                   <span class="text-cyan-300 font-bold">${(a.exp_in_level || 0).toLocaleString()} / ${(a.exp_needed_for_next || 0).toLocaleString()} EXP (${a.progress_percent || 0}%)</span>
                 </div>
                 <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-white/10 p-0.5">
@@ -481,30 +573,35 @@
                 </div>
               </div>
               
-              <!-- Total EXP Number -->
-              <div class="text-2xl font-extrabold text-white tabular-nums tracking-tight pt-1 flex items-baseline justify-between">
+              <!-- Total EXP & Session Gain -->
+              <div class="text-xl font-extrabold text-white tabular-nums tracking-tight pt-1 flex items-baseline justify-between flex-wrap gap-1">
                 <span>${(a.total_exp || 0).toLocaleString()} <span class="text-xs text-slate-400 font-normal">TOTAL EXP</span></span>
-                <span class="text-xs text-emerald-400 font-bold">+${(a.session_exp || 0).toLocaleString()} Session</span>
+                <span class="text-xs text-emerald-400 font-bold">+${(a.session_exp || 0).toLocaleString()} Session Gain</span>
               </div>
 
               <!-- Stats Breakdown -->
-              <div class="pt-2 border-t border-white/10 space-y-1 text-[11px]">
+              <div class="pt-2 border-t border-white/10 space-y-1.5 text-[11px]">
                 <div class="flex justify-between items-center">
                   <span class="text-slate-400 font-sans">Last Match Verified:</span>
-                  <span class="${(a.last_match_exp || 0) > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">+${a.last_match_exp || 0} EXP (Garena Verified)</span>
+                  <span class="${(a.last_match_exp || 0) > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">+${a.last_match_exp || 0} EXP (Garena Checked)</span>
                 </div>
 
                 <div class="flex justify-between items-center">
-                  <span class="text-slate-400 font-sans">Matches Completed:</span>
+                  <span class="text-slate-400 font-sans">Completed Matches:</span>
                   <span class="text-slate-300 font-semibold">${a.matches_played || 0} games</span>
+                </div>
+
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400 font-sans">Daily EXP Limit Monitor:</span>
+                  <span class="${(a.consecutive_zero_exp || 0) >= 3 ? 'text-amber-400 font-bold' : 'text-slate-400'}">${a.consecutive_zero_exp || 0}/3 zero-EXP matches</span>
                 </div>
               </div>
 
             </div>
 
             <!-- Bottom Controller Toolbar -->
-            <div class="flex items-center justify-between pt-1 font-mono text-xs">
-              <div class="text-[10px] text-slate-500 truncate max-w-[120px]" title="${a.device_name}">
+            <div class="flex items-center justify-between pt-1 font-mono text-xs gap-2">
+              <div class="text-[10px] text-slate-500 truncate max-w-[130px]" title="${a.device_name}">
                 ${a.device_name || 'Android Profile'}
               </div>
 
@@ -519,11 +616,11 @@
                   </button>
                 `}
 
-                <button onclick="verifyAccount('${a.account_id}')" title="Re-fetch live level & exp from Garena" class="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer">
+                <button onclick="verifyAccount('${a.account_id}')" title="Re-check live level & exp directly from Garena" class="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer">
                   <span>🔄</span> Check
                 </button>
 
-                <button onclick="deleteAccount('${a.account_id}')" title="Remove account from accounts.js" class="w-7 h-7 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs flex items-center justify-center transition cursor-pointer">
+                <button onclick="deleteAccount('${a.account_id}')" title="Remove account from bot.db" class="w-7 h-7 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs flex items-center justify-center transition cursor-pointer">
                   ✕
                 </button>
               </div>
@@ -558,26 +655,24 @@
         }
 
         container.innerHTML = logs.map(l => {
-          let badge = 'bg-slate-900 text-slate-400 border-slate-800';
-          if (l.level === 'SUCCESS') badge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-          if (l.level === 'WARN') badge = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-          if (l.level === 'ERROR') badge = 'bg-red-500/10 text-red-400 border-red-500/30';
-          if (l.action === 'EXP_VERIFIED') badge = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+          let badgeColor = 'text-cyan-400 border-cyan-500/30 bg-cyan-950/40';
+          if (l.level === 'SUCCESS') badgeColor = 'text-emerald-400 border-emerald-500/30 bg-emerald-950/40';
+          if (l.level === 'WARN') badgeColor = 'text-amber-400 border-amber-500/30 bg-amber-950/40';
+          if (l.level === 'ERROR') badgeColor = 'text-red-400 border-red-500/30 bg-red-950/40';
+          if (l.level === 'DEBUG') badgeColor = 'text-slate-400 border-slate-700 bg-slate-900/40';
 
           return `
-            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-1">
-              <div class="flex items-center justify-between text-[11px]">
-                <div class="flex items-center gap-2">
-                  <span class="text-slate-400 font-bold">${l.timestamp}</span>
-                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono ${badge} border font-bold">${l.action}</span>
-                </div>
-                <span class="font-mono text-slate-400 text-[10px]">UID: ${l.account_id}</span>
-              </div>
-              <div class="text-slate-200 text-xs pl-0.5">${l.details}</div>
+            <div class="flex items-start gap-2.5 p-2 rounded-xl hover:bg-white/5 transition">
+              <span class="text-slate-500 text-[11px] shrink-0 font-mono">${l.timestamp}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${badgeColor}">${l.event}</span>
+              <span class="text-slate-200 text-xs font-mono break-all">${l.message}</span>
             </div>
           `;
         }).join('');
-      } catch (e) {}
+
+        container.scrollTop = container.scrollHeight;
+      } catch (e) {
+      }
     }
 
     async function handleAddAccount(e) {
@@ -585,12 +680,11 @@
       const btn = document.getElementById('btn-submit-add');
       const errBox = document.getElementById('add-error');
       errBox.classList.add('hidden');
-
-      btn.innerText = 'Connecting to Garena...';
+      btn.innerText = 'Extracting Garena Data...';
       btn.disabled = true;
 
       const payload = {
-        account_id: document.getElementById('input-uid').value.trim(),
+        uid: document.getElementById('input-uid').value.trim(),
         password: document.getElementById('input-password').value.trim()
       };
 
@@ -601,21 +695,60 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (data.status === 'success') {
+        if (data.success || data.status === 'success') {
           closeModal();
           document.getElementById('input-uid').value = '';
           document.getElementById('input-password').value = '';
           fetchStatus();
         } else {
-          errBox.innerText = data.message || 'Error registering account';
+          errBox.innerText = data.error || data.message || 'Error registering account';
           errBox.classList.remove('hidden');
         }
       } catch (err) {
         errBox.innerText = 'Failed to connect to server';
         errBox.classList.remove('hidden');
       } finally {
-        btn.innerText = 'Save & Start Farming';
+        btn.innerText = 'Save & Link Account';
         btn.disabled = false;
+      }
+    }
+
+    async function handleImportAccounts(e) {
+      e.preventDefault();
+      const txt = document.getElementById('input-import-json').value.trim();
+      const errBox = document.getElementById('import-error');
+      const succBox = document.getElementById('import-success');
+      errBox.classList.add('hidden');
+      succBox.classList.add('hidden');
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(txt);
+      } catch (err) {
+        errBox.innerText = 'Invalid JSON format. Please paste a valid JSON array of accounts.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/accounts/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ accounts: Array.isArray(parsed) ? parsed : [parsed] })
+        });
+        const data = await res.json();
+        if (data.success) {
+          succBox.innerText = `Successfully imported ${data.imported_count} accounts into bot.db!`;
+          succBox.classList.remove('hidden');
+          fetchStatus();
+          setTimeout(closeImportModal, 1500);
+        } else {
+          errBox.innerText = data.error || 'Import failed.';
+          errBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        errBox.innerText = 'Server error during import';
+        errBox.classList.remove('hidden');
       }
     }
 
@@ -672,7 +805,7 @@
     }
 
     async function deleteAccount(id) {
-      if (!confirm(`Remove account UID ${id} from accounts.js?`)) return;
+      if (!confirm(`Remove account UID ${id} from bot.db?`)) return;
       await fetch(`/api/accounts/delete/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -684,7 +817,7 @@
       document.getElementById('logs-stream').innerHTML = '<div class="text-slate-500 italic">Feed cleared. Waiting for new socket events...</div>';
     }
 
-    // Polling intervals
+    // Auto-refresh intervals for seamless cross-device synchronization
     fetchStatus();
     setInterval(fetchStatus, 2000);
     setInterval(renderLogs, 3000);
