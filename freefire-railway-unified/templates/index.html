@@ -385,13 +385,24 @@
             </div>
 
             <!-- EXP & Level Box -->
-            <div class="p-4 rounded-2xl bg-slate-950/80 border border-white/5 space-y-2.5 font-mono text-xs">
+            <div class="p-4 rounded-2xl bg-slate-950/80 border border-white/5 space-y-3 font-mono text-xs">
               <div class="flex justify-between items-center">
-                <span class="text-slate-400 font-sans text-xs">Level Rank</span>
-                <span class="text-cyan-300 font-extrabold text-xs px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">Level ${a.level}</span>
+                <span class="text-slate-400 font-sans text-xs">Level Progression</span>
+                <span class="text-cyan-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30">Level ${a.level}</span>
+              </div>
+
+              <!-- Animated Progress Bar to Next Level -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                  <span>To Level ${a.level + 1}</span>
+                  <span class="text-cyan-300 font-bold">${(a.exp_in_level || 0).toLocaleString()} / ${(a.exp_needed_for_next || 0).toLocaleString()} EXP (${a.progress_percent || 0}%)</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-white/10">
+                  <div class="bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 h-2 rounded-full transition-all duration-700" style="width: ${a.progress_percent || 0}%"></div>
+                </div>
               </div>
               
-              <div class="text-xl font-extrabold text-white tabular-nums tracking-tight">
+              <div class="text-xl font-extrabold text-white tabular-nums tracking-tight pt-1">
                 ${(a.total_exp || 0).toLocaleString()} <span class="text-xs text-slate-500 font-normal">TOTAL EXP</span>
               </div>
 
