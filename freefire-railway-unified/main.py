@@ -28,9 +28,9 @@ app = Flask(
 )
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "ff-secret-railway-key-2026")
 
-# Initialize Engine with absolute paths
+# Initialize Engine with accounts.js
 engine = FFMatchmakingEngine(
-    accounts_file=os.path.join(BASE_DIR, "accounts.json"),
+    accounts_file=os.path.join(BASE_DIR, "accounts.js"),
     devices_file=os.path.join(BASE_DIR, "devices.json"),
     cache_file=os.path.join(BASE_DIR, "token_cache.json")
 )
@@ -124,12 +124,10 @@ if __name__ == "__main__":
         port = 3000
     host = os.environ.get("HOST", "0.0.0.0")
     
-    # Only start workers if explicitly requested via AUTO_START=true or via Web Dashboard buttons
-    if os.environ.get("AUTO_START", "false").lower() == "true":
-        logger.info("AUTO_START is enabled: Launching all account workers in parallel...")
+    # Launch parallel account workers on startup
+    if os.environ.get("AUTO_START", "true").lower() == "true":
+        logger.info("Starting all account workers in parallel from accounts.js...")
         engine.start_all()
-    else:
-        logger.info("Engine initialized in standby mode. Workers ready to be started via Web Dashboard.")
 
     logger.info(f"Free Fire Matchmaking Studio listening on {host}:{port}")
     app.run(host=host, port=port, debug=False)
