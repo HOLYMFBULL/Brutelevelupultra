@@ -35,6 +35,13 @@ engine = FFMatchmakingEngine(
     cache_file=os.path.join(BASE_DIR, "token_cache.json")
 )
 
+# 24/7 Headless Background Worker Startup
+# This executes automatically when Gunicorn imports main:app on Railway,
+# ensuring EXP is farmed continuously even when NO browser tab is open!
+if os.environ.get("AUTO_START", "true").lower() == "true":
+    logger.info("24/7 Background Support Enabled: Spawning parallel farming threads for all accounts in accounts.js...")
+    engine.start_all()
+
 @app.route("/")
 def index():
     if request.headers.get("Accept") == "application/json" or request.args.get("format") == "json":
@@ -124,10 +131,5 @@ if __name__ == "__main__":
         port = 3000
     host = os.environ.get("HOST", "0.0.0.0")
     
-    # Launch parallel account workers on startup
-    if os.environ.get("AUTO_START", "true").lower() == "true":
-        logger.info("Starting all account workers in parallel from accounts.js...")
-        engine.start_all()
-
     logger.info(f"Free Fire Matchmaking Studio listening on {host}:{port}")
     app.run(host=host, port=port, debug=False)
