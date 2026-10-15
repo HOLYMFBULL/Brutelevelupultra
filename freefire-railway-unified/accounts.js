@@ -1,1 +1,20 @@
-module.exports = [];
+module.exports = [
+  {
+    "uid": "8164540713",
+    "password": "FD84FECCCEF1AA4C84D1F2C0DA94EF496474FB5EE949CB038BDF5F5A9FECB762",
+    "real_ff_uid": "18622346379",
+    "nickname": "Emi9m3f4c",
+    "level": 12,
+    "total_exp": 8710,
+    "region": "IND"
+  },
+  {
+    "uid": "8205471799",
+    "password": "5ECCDAC9565614AD4919F9E97E761D715B062B4C233C564A839F14C4955D2F7D",
+    "real_ff_uid": "18659440072",
+    "nickname": "Bot8V9T0K4d4",
+    "level": 6,
+    "total_exp": 2149,
+    "region": "IND"
+  }
+];

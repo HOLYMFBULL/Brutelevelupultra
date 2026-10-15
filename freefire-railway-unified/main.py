@@ -109,6 +109,16 @@ def api_accounts_delete(account_id):
     result = engine.delete_account(account_id)
     return jsonify(result)
 
+@app.route("/api/accounts/verify/<account_id>", methods=["POST"])
+def api_accounts_verify(account_id):
+    result = engine.verify_account(account_id)
+    return jsonify(result)
+
+@app.route("/api/accounts/verify_all", methods=["POST"])
+def api_accounts_verify_all():
+    result = engine.verify_all()
+    return jsonify(result)
+
 @app.route("/api/accounts/export/json")
 def api_export_json():
     content = engine.export_accounts_json()

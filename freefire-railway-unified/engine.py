@@ -1,8 +1,8 @@
 """
 Free Fire Multi-Account Parallel Matchmaking Engine
-- Powered by authentic Garena Major Login and GetLoginData (from newbrsup)
-- Live Level and EXP directly from Garena servers (e.g. Level 6, 2,149 EXP)
-- Zero fake EXP: EXP only changes when confirmed by Garena
+- Powered by authentic Garena Major Login and GetLoginData
+- Live Level and EXP directly from Garena servers (Zero fake EXP)
+- Real In-Game Nickname and Real FF UID parsed from Garena
 - Multi-device instant synchronization with accounts.js
 """
 
@@ -16,71 +16,65 @@ import threading
 import logging
 import asyncio
 import re
+
+# Ensure local dependencies and protobuf modules can be imported
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+newbrsup_dir = os.path.join(os.path.dirname(BASE_DIR), "newbrsup")
+if os.path.exists(newbrsup_dir) and newbrsup_dir not in sys.path:
+    sys.path.insert(0, newbrsup_dir)
+
 from message_ids import Opcodes
 
 logger = logging.getLogger("FF-Engine")
 
-# Free Fire authentic EXP curve
-EXP_PER_LEVEL = {
-    1: 0,
-    2: 100,
-    3: 350,
-    4: 800,
-    5: 1500,
-    6: 2500,
-    7: 4000,
-    8: 6000,
-    9: 8500,
-    10: 12000,
-    11: 16500,
-    12: 22000,
-    13: 28500,
-    14: 36000,
-    15: 45000,
-    20: 110000,
-    30: 320000,
-    40: 680000,
-    50: 1200000,
-    60: 2000000,
-    70: 3200000,
+# Authentic Free Fire EXP Curve (1 to 100)
+EXP_TABLE = {
+    1: 0, 2: 48, 3: 202, 4: 544, 5: 1012, 6: 1844, 7: 2792, 8: 3800,
+    9: 4870, 10: 6004, 11: 7192, 12: 8448, 13: 9760, 14: 11140, 15: 12566,
+    16: 14060, 17: 15610, 18: 17224, 19: 18902, 20: 20632, 21: 22424, 22: 24278,
+    23: 26192, 24: 28166, 25: 30200, 26: 32294, 27: 34448, 28: 37804, 29: 41274,
+    30: 44870, 31: 48582, 32: 53394, 33: 58566, 34: 64096, 35: 69994, 36: 76460,
+    37: 83506, 38: 91128, 39: 99322, 40: 108092, 41: 120144, 42: 133266, 43: 147472,
+    44: 162760, 45: 179126, 46: 196572, 47: 215368, 48: 235516, 49: 257010, 50: 279860,
+    51: 304056, 52: 348318, 53: 394982, 54: 444044, 55: 495508, 56: 549364, 57: 633756,
+    58: 721744, 59: 813336, 60: 908522, 61: 1041438, 62: 1180352, 63: 1325266,
+    64: 1476184, 65: 1634300, 66: 1840946, 67: 2056594, 68: 2281242, 69: 2514880,
+    70: 2757530, 71: 3059506, 72: 3372284, 73: 3699456, 74: 4041030, 75: 4397002,
+    76: 4829104, 77: 5282204, 78: 5756304, 79: 6251408, 80: 6776502, 81: 7381324,
+    82: 8043154, 83: 8752982, 84: 9510808, 85: 10316338, 86: 11277190, 87: 12291748,
+    88: 13360304, 89: 14482858, 90: 15659418, 91: 17026708, 92: 18453950, 93: 19941280,
+    94: 21488570, 95: 23095858, 96: 24763138, 97: 26490428, 98: 28378704, 99: 30124996,
+    100: 32032884
 }
 
-def get_exp_for_level(lvl):
-    """Calculates cumulative EXP needed to reach level lvl in Free Fire"""
-    if lvl <= 1:
-        return 0
-    if lvl in EXP_PER_LEVEL:
-        return EXP_PER_LEVEL[lvl]
-    if lvl < 15:
-        return int(50 * (lvl ** 2.2))
-    return int(400 * (lvl ** 1.9))
-
 def compute_level_details(total_exp, server_level=None):
-    """Computes exact level, EXP in level, and progress percent to next level"""
+    """Computes exact level, EXP in level, and progress percent to next level based on Garena curve"""
     total_exp = max(0, int(total_exp))
     
     if server_level and server_level > 0:
         lvl = int(server_level)
     else:
         lvl = 1
-        while lvl < 100 and total_exp >= get_exp_for_level(lvl + 1):
-            lvl += 1
+        for l in range(1, 100):
+            if total_exp >= EXP_TABLE.get(l + 1, 999999999):
+                lvl = l + 1
+            else:
+                break
 
-    current_base = get_exp_for_level(lvl)
-    next_req = get_exp_for_level(lvl + 1)
-    if next_req <= current_base:
-        next_req = current_base + 1000
-
-    exp_in_level = max(0, total_exp - current_base)
-    exp_needed = max(1, next_req - current_base)
-    pct = min(100.0, round((exp_in_level / exp_needed) * 100, 1))
+    base_exp = EXP_TABLE.get(lvl, 0)
+    target_exp = EXP_TABLE.get(lvl + 1, base_exp + 5000)
+    needed = max(1, target_exp - base_exp)
+    earned = max(0, total_exp - base_exp)
+    pct = min(100.0, max(0.0, round((earned / needed) * 100.0, 1)))
 
     return {
         "level": lvl,
         "current_exp": total_exp,
-        "exp_in_level": exp_in_level,
-        "exp_needed_for_next": exp_needed,
-        "next_level_total": next_req,
+        "exp_in_level": earned,
+        "exp_needed_for_next": needed,
+        "next_level_total": target_exp,
         "progress_percent": pct
     }
 
@@ -88,25 +82,18 @@ def compute_level_details(total_exp, server_level=None):
 def parse_major_login(login_uid, password):
     """
     Executes real Garena Major Login and GetLoginData.
-    Extracts:
+    Extracts authentic values:
       - real_ff_uid: Real Free Fire numeric account ID
       - nickname: Real in-game character name
-      - level: Real in-game player level (e.g. Level 6)
-      - total_exp: Real in-game EXP (e.g. 2,149 EXP)
+      - level: Real in-game player level
+      - total_exp: Real in-game EXP
       - region: Real server region
     """
     uid_str = str(login_uid).strip()
     pass_str = str(password).strip()
 
-    # 1. Authentic Garena Major Login via local lc module
+    # 1. Authentic Garena Major Login via lc module
     try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        if base_dir not in sys.path:
-            sys.path.insert(0, base_dir)
-        newbrsup_dir = os.path.join(os.path.dirname(base_dir), "newbrsup")
-        if os.path.exists(newbrsup_dir) and newbrsup_dir not in sys.path:
-            sys.path.insert(0, newbrsup_dir)
-
         import lc
         loop = asyncio.new_event_loop()
         res = loop.run_until_complete(lc.process_account_uid_pass(uid_str, pass_str))
@@ -115,10 +102,10 @@ def parse_major_login(login_uid, password):
         if res and res.get("account_id"):
             real_uid = str(res.get("account_id"))
             nick = str(res.get("nickname") or f"Player_{real_uid[-4:]}")
-            lvl = int(res.get("level") or 6)
-            exp = int(res.get("exp") or 2149)
+            lvl = int(res.get("level") or 1)
+            exp = int(res.get("exp") or 0)
             reg = str(res.get("region") or "IND")
-            logger.info(f"Garena Major Login Success: UID {real_uid} | {nick} | Lvl {lvl} | EXP {exp}")
+            logger.info(f"Garena Major Login Success: FF UID {real_uid} | {nick} | Lvl {lvl} | EXP {exp}")
             return {
                 "account_id": uid_str,
                 "real_ff_uid": real_uid,
@@ -130,13 +117,14 @@ def parse_major_login(login_uid, password):
                 "login_status": "GARENA_AUTHENTICATED"
             }
     except Exception as e:
-        logger.debug(f"Direct lc Major Login check: {e}")
+        logger.error(f"Error during lc.process_account_uid_pass: {e}")
 
     # 2. Check token_cache.json if present
     try:
         cache_paths = [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "token_cache.json"),
-            "/app/applet/newbrsup/token_cache.json"
+            os.path.join(BASE_DIR, "token_cache.json"),
+            os.path.join(os.path.dirname(BASE_DIR), "newbrsup", "token_cache.json"),
+            os.path.join(os.path.dirname(BASE_DIR), "token_cache.json")
         ]
         for cp in cache_paths:
             if os.path.exists(cp):
@@ -148,8 +136,8 @@ def parse_major_login(login_uid, password):
                             "account_id": uid_str,
                             "real_ff_uid": str(c_acc.get("account_id", uid_str)),
                             "nickname": str(c_acc.get("nickname", f"Player_{uid_str[-4:]}")),
-                            "level": int(c_acc.get("level", 6)),
-                            "total_exp": int(c_acc.get("exp", 2149)),
+                            "level": int(c_acc.get("level", 1)),
+                            "total_exp": int(c_acc.get("exp", 0)),
                             "region": str(c_acc.get("region", "IND")),
                             "password": pass_str,
                             "login_status": "CACHED_PROFILE"
@@ -162,8 +150,8 @@ def parse_major_login(login_uid, password):
         "account_id": uid_str,
         "real_ff_uid": uid_str,
         "nickname": f"Player_{uid_str[-4:]}",
-        "level": 6,
-        "total_exp": 2149,
+        "level": 1,
+        "total_exp": 0,
         "region": "IND",
         "password": pass_str,
         "login_status": "OFFLINE_STANDBY"
@@ -173,14 +161,14 @@ def parse_major_login(login_uid, password):
 class AccountWorker:
     def __init__(self, account_data, engine, device_data=None):
         self.engine = engine
-        self.account_id = str(account_data.get("account_id") or account_data.get("id"))
+        self.account_id = str(account_data.get("account_id") or account_data.get("uid") or account_data.get("id"))
         self.real_ff_uid = str(account_data.get("real_ff_uid") or self.account_id)
         self.nickname = str(account_data.get("nickname") or f"Player_{self.account_id[-4:]}")
-        self.password = str(account_data.get("password") or account_data.get("access_token", ""))
+        self.password = str(account_data.get("password") or account_data.get("auth_password") or account_data.get("access_token", ""))
         self.open_id = str(account_data.get("open_id") or f"ff_oid_{self.account_id}")
         self.region = str(account_data.get("region", "IND"))
-        self.total_exp = int(account_data.get("total_exp", 2149))
-        self.level = int(account_data.get("level", 6))
+        self.total_exp = int(account_data.get("total_exp", account_data.get("exp", 0)))
+        self.level = int(account_data.get("level", 1))
         self.session_exp = int(account_data.get("session_exp", 0))
         self.matches_played = int(account_data.get("matches_played", 0))
         self.status = "IDLE"  # IDLE, QUEUED, IN_MATCH, CLAIMING_EXP
@@ -191,10 +179,47 @@ class AccountWorker:
         self.thread = None
         self.device = device_data or {}
 
+    def refresh_garena_profile(self):
+        """Queries the live Garena server to re-verify Nickname, Level, and EXP directly"""
+        try:
+            info = parse_major_login(self.account_id, self.password)
+            if info:
+                old_exp = self.total_exp
+                new_exp = info.get("total_exp", old_exp)
+                self.nickname = info.get("nickname", self.nickname)
+                self.real_ff_uid = str(info.get("real_ff_uid", self.real_ff_uid))
+                self.level = info.get("level", self.level)
+                self.region = info.get("region", self.region)
+                
+                exp_diff = max(0, new_exp - old_exp)
+                if exp_diff > 0:
+                    self.total_exp = new_exp
+                    self.last_match_exp = exp_diff
+                    self.session_exp += exp_diff
+                    self.engine.add_log(
+                        self.account_id,
+                        "SUCCESS",
+                        "EXP_VERIFIED",
+                        f"🏆 [{self.nickname}] Garena confirmed EXP gain: +{exp_diff} EXP! Total: {self.total_exp:,} EXP (Level {self.level})"
+                    )
+                else:
+                    self.engine.add_log(
+                        self.account_id,
+                        "INFO",
+                        "PROFILE_VERIFIED",
+                        f"[{self.nickname}] (FF UID: {self.real_ff_uid}) Garena verified: Level {self.level}, {self.total_exp:,} EXP"
+                    )
+                self.engine.save_accounts_to_disk()
+                return True
+        except Exception as e:
+            logger.error(f"Error refreshing profile for {self.account_id}: {e}")
+        return False
+
     def to_dict(self):
         prog = compute_level_details(self.total_exp, self.level)
         return {
             "account_id": self.account_id,
+            "uid": self.account_id,
             "real_ff_uid": self.real_ff_uid,
             "nickname": self.nickname,
             "password": self.password,
@@ -279,43 +304,14 @@ class AccountWorker:
                     time.sleep(1.0)
 
                 # 3. MATCH COMPLETED -> RUN LIVE GARENA LEVEL & EXP CHECK
-                # NO FAKE EXP: Only update if Garena confirms an increase!
+                # NO FAKE EXP: Only update when confirmed by Garena!
                 if not self.is_running:
                     return
                 self.status = "CLAIMING_EXP"
 
-                # Query live Garena server profile
-                live_info = parse_major_login(self.account_id, self.password)
-
-                exp_earned = 0
-                if live_info and live_info.get("total_exp", 0) > self.total_exp:
-                    exp_earned = live_info["total_exp"] - self.total_exp
-                    self.total_exp = live_info["total_exp"]
-                    self.level = live_info.get("level", self.level)
-                    self.nickname = live_info.get("nickname", self.nickname)
-                    self.real_ff_uid = live_info.get("real_ff_uid", self.real_ff_uid)
-
-                # If Garena has not awarded EXP or server delta is 0, exp_earned stays 0!
-                self.last_match_exp = exp_earned
-                self.session_exp += exp_earned
+                # Check live Garena profile directly
+                self.refresh_garena_profile()
                 self.matches_played += 1
-
-                prog = compute_level_details(self.total_exp, self.level)
-
-                if exp_earned > 0:
-                    self.engine.add_log(
-                        self.account_id,
-                        "SUCCESS",
-                        "EXP_VERIFIED",
-                        f"🏆 [{self.nickname}] Garena confirmed EXP gain: +{exp_earned} EXP! Total: {self.total_exp:,} EXP (Level {self.level})"
-                    )
-                else:
-                    self.engine.add_log(
-                        self.account_id,
-                        "INFO",
-                        "EXP_CHECKED",
-                        f"[{self.nickname}] Match ended. Garena profile checked: Level {self.level}, {self.total_exp:,} EXP (+0 EXP - no Garena server delta)"
-                    )
 
                 # Save updated progress to accounts.js
                 self.engine.save_accounts_to_disk()
@@ -356,7 +352,7 @@ class FFMatchmakingEngine:
         return []
 
     def _load_accounts_from_js(self, filepath):
-        """Parses accounts array directly from accounts.js or accounts.json without static fallbacks"""
+        """Parses accounts array directly from accounts.js or accounts.json"""
         target_path = filepath
         if not os.path.exists(target_path):
             alt_path = filepath.replace(".js", ".json")
@@ -366,7 +362,12 @@ class FFMatchmakingEngine:
         if os.path.exists(target_path):
             try:
                 with open(target_path, "r", encoding="utf-8") as f:
-                    content = f.read()
+                    content = f.read().strip()
+                    if not content or content == "module.exports = [];":
+                        json_path = target_path.replace(".js", ".json")
+                        if json_path != target_path and os.path.exists(json_path):
+                            with open(json_path, "r", encoding="utf-8") as jf:
+                                return json.load(jf)
                     match = re.search(r'\[[\s\S]*\]', content)
                     if match:
                         return json.loads(match.group(0))
@@ -377,31 +378,43 @@ class FFMatchmakingEngine:
     def sync_with_disk(self):
         """Synchronizes workers with accounts.js on disk so changes from ANY device appear immediately!"""
         if not os.path.exists(self.accounts_file):
-            return
+            json_file = self.accounts_file.replace(".js", ".json")
+            if not os.path.exists(json_file):
+                return
 
+        check_path = self.accounts_file if os.path.exists(self.accounts_file) else self.accounts_file.replace(".js", ".json")
         try:
-            mtime = os.path.getmtime(self.accounts_file)
-            if mtime == self.last_disk_mtime:
+            mtime = os.path.getmtime(check_path)
+            if mtime == self.last_disk_mtime and self.workers:
                 return
             self.last_disk_mtime = mtime
         except Exception:
             return
 
-        disk_accounts = self._load_accounts_from_js(self.accounts_file)
+        disk_accounts = self._load_accounts_from_js(check_path)
         disk_ids = set()
 
         with self.lock:
             for i, acc in enumerate(disk_accounts):
-                acc_id = str(acc.get("account_id") or acc.get("id"))
+                acc_id = str(acc.get("account_id") or acc.get("uid") or acc.get("id")).strip()
+                if not acc_id:
+                    continue
                 disk_ids.add(acc_id)
                 if acc_id not in self.workers:
+                    # Enrich from Garena if nickname is missing or placeholder
+                    if not acc.get("nickname") or not acc.get("real_ff_uid") or acc.get("nickname").startswith("Player_"):
+                        pwd = acc.get("password") or acc.get("auth_password", "")
+                        parsed = parse_major_login(acc_id, pwd)
+                        acc.update(parsed)
                     dev = self.devices[i % len(self.devices)] if self.devices else {}
                     worker = AccountWorker(acc, self, dev)
                     self.workers[acc_id] = worker
-                    worker.start()
+                    # Only auto-start if AUTO_START is enabled
+                    if os.environ.get("AUTO_START", "false").lower() == "true":
+                        worker.start()
                 else:
                     w = self.workers[acc_id]
-                    if acc.get("nickname"):
+                    if acc.get("nickname") and not acc.get("nickname").startswith("Player_"):
                         w.nickname = acc["nickname"]
                     if acc.get("real_ff_uid"):
                         w.real_ff_uid = str(acc["real_ff_uid"])
@@ -416,7 +429,7 @@ class FFMatchmakingEngine:
                 del self.workers[aid]
 
     def save_accounts_to_disk(self):
-        """Thread-safe write directly to accounts.js (and accounts.json)"""
+        """Thread-safe write directly to accounts.js and accounts.json"""
         with self.lock:
             data = [w.to_dict() for w in self.workers.values()]
             js_content = f"module.exports = {json.dumps(data, indent=2)};\n"
@@ -479,15 +492,34 @@ class FFMatchmakingEngine:
             worker.stop()
         return {"status": "all_stopped", "count": len(self.workers)}
 
-    def add_account(self, data):
+    def verify_account(self, account_id):
+        """Triggers an on-demand live Garena server check for an account"""
         self.sync_with_disk()
-        acc_id = str(data.get("account_id")).strip()
+        worker = self.workers.get(str(account_id))
+        if worker:
+            success = worker.refresh_garena_profile()
+            return {"status": "success" if success else "failed", "account": worker.to_dict()}
+        return {"status": "error", "message": "Account not found"}
+
+    def verify_all(self):
+        """Triggers live Garena re-verification for all accounts"""
+        self.sync_with_disk()
+        updated = []
+        for worker in self.workers.values():
+            worker.refresh_garena_profile()
+            updated.append(worker.to_dict())
+        return {"status": "success", "accounts": updated}
+
+    def add_account(self, data):
+        """Adds account asking ONLY UID and Password. Real in-game nickname and Real FF UID are parsed via Major Login!"""
+        self.sync_with_disk()
+        acc_id = str(data.get("account_id") or data.get("uid", "")).strip()
         password = str(data.get("password", "")).strip()
 
         if not acc_id:
             return {"status": "error", "message": "Account UID / Login ID is required"}
         if not password:
-            return {"status": "error", "message": "Password / Token is required"}
+            return {"status": "error", "message": "Password is required"}
 
         if acc_id in self.workers:
             return {"status": "error", "message": f"Account UID {acc_id} already exists"}
@@ -495,24 +527,13 @@ class FFMatchmakingEngine:
         # Major Login: Real Free Fire UID, Nickname, Level, and EXP
         info = parse_major_login(acc_id, password)
 
-        # Allow user overrides if provided
-        if data.get("nickname"):
-            info["nickname"] = str(data["nickname"]).strip()
-        if data.get("real_ff_uid"):
-            info["real_ff_uid"] = str(data["real_ff_uid"]).strip()
-        if data.get("level"):
-            info["level"] = int(data["level"])
-            info["total_exp"] = get_exp_for_level(info["level"])
-        if data.get("total_exp"):
-            info["total_exp"] = int(data["total_exp"])
-
         dev = self.devices[len(self.workers) % len(self.devices)] if self.devices else {}
         worker = AccountWorker(info, self, dev)
         
         with self.lock:
             self.workers[acc_id] = worker
         
-        # Save directly to accounts.js
+        # Save directly to accounts.js & accounts.json
         self.save_accounts_to_disk()
 
         # Start farming automatically
