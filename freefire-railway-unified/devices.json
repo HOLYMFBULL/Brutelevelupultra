@@ -1,0 +1,32 @@
+[
+  {
+    "device_name": "Samsung Galaxy S23 Ultra",
+    "manufacturer": "Samsung",
+    "model": "SM-S918B",
+    "android_id": "9a7f302b1c4e5d88",
+    "imei": "864201048291034",
+    "mac": "28:6C:07:91:DE:3B",
+    "os_version": "Android 14 (OneUI 6.0)",
+    "app_version": "1.104.1"
+  },
+  {
+    "device_name": "OnePlus 11 5G",
+    "manufacturer": "OnePlus",
+    "model": "CPH2449",
+    "android_id": "4b8e2190f3c5a712",
+    "imei": "867391051928471",
+    "mac": "74:AC:B9:44:11:F0",
+    "os_version": "Android 13 (OxygenOS 13.1)",
+    "app_version": "1.104.1"
+  },
+  {
+    "device_name": "Xiaomi POCO F5 Pro",
+    "manufacturer": "Xiaomi",
+    "model": "23013PC75G",
+    "android_id": "e2f1839a04b76c5d",
+    "imei": "861902049182375",
+    "mac": "5C:A6:E6:80:2D:9A",
+    "os_version": "Android 13 (MIUI 14)",
+    "app_version": "1.104.1"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "account_id": 6002130241,
+    "nickname": "Xora_Alpha_01",
+    "open_id": "ff_openid_6002130241",
+    "region": "IND",
+    "access_token": "ff_token_alpha_a7f920bc914",
+    "level": 68,
+    "rank": "Grandmaster",
+    "status": "active"
+  },
+  {
+    "account_id": 6513583182,
+    "nickname": "Thunder_Strike_02",
+    "open_id": "ff_openid_6513583182",
+    "region": "IND",
+    "access_token": "ff_token_strike_b39d10e8f2",
+    "level": 54,
+    "rank": "Heroic",
+    "status": "active"
+  },
+  {
+    "account_id": 8661324808,
+    "nickname": "Ghost_Support_03",
+    "open_id": "ff_openid_8661324808",
+    "region": "IND",
+    "access_token": "ff_token_ghost_c401e921d4",
+    "level": 61,
+    "rank": "Master",
+    "status": "active"
+  }
+]

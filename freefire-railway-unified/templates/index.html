@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Free Fire Matchmaking Bot Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1.5rem; max-width: 600px; margin: 0 auto; border: 1px solid #334155; }
+    h1 { color: #38bdf8; font-size: 1.3rem; }
+    button { background: #0284c7; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 500; }
+    button:hover { background: #0369a1; }
+    pre { background: #090d16; padding: 1rem; border-radius: 6px; overflow-x: auto; color: #94a3b8; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Railway Free Fire Bot Dashboard</h1>
+    <p>Engine status: <strong style="color:#34d399">ONLINE</strong></p>
+    <button onclick="fetch('/api/match/start', {method:'POST'}).then(r=>r.json()).then(d=>alert('Queued: '+JSON.stringify(d)))">Trigger Match</button>
+    <button onclick="fetch('/api/match/cancel', {method:'POST'}).then(r=>r.json()).then(d=>alert('Cancelled'))" style="background:#dc2626">Cancel Match</button>
+    <h3>Live Engine Telemetry (/api/status)</h3>
+    <pre id="telemetry">Loading...</pre>
+  </div>
+  <script>
+    async function update() {
+      try {
+        const res = await fetch('/api/status');
+        document.getElementById('telemetry').innerText = JSON.stringify(await res.json(), null, 2);
+      } catch(e) {}
+    }
+    update();
+    setInterval(update, 3000);
+  </script>
+</body>
+</html>

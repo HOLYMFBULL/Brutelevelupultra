@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package ff.core;
+
+message DeviceFingerprint {
+  string android_id = 1;
+  string imei = 2;
+  string mac_address = 3;
+  string device_model = 4;
+  string manufacturer = 5;
+  string os_build = 6;
+}
+
+message LoginRequest {
+  string open_id = 1;
+  string access_token = 2;
+  string platform = 3;
+  string region = 4;
+  DeviceFingerprint device = 5;
+  int64 client_timestamp = 6;
+}
+
+message LoginResponse {
+  int32 error_code = 1;
+  int64 account_id = 2;
+  string session_token = 3;
+  int64 token_expire_at = 4;
+  string lobby_gateway_ip = 5;
+  int32 lobby_gateway_port = 6;
+  string ban_reason = 7;
+}
+
+message HeartbeatPing {
+  int64 client_timestamp = 1;
+  int32 latency_ms = 2;
+  int32 packet_sequence = 3;
+}
