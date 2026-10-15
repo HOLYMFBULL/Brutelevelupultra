@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual env
+venv/
+.venv/
+env/
+ENV/
+
+# Env variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Runtime data (jangan di-commit — credentials!)
+accounts.json
+token_cache.json
+devices.json
+users.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Railway
+.railway/

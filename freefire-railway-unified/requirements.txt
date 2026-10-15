@@ -4,3 +4,7 @@ protobuf>=4.25.3
 requests>=2.32.3
 pycryptodome>=3.20.0
 urllib3>=2.2.1
+httpx>=0.27.0
+aiohttp>=3.10.0
+protobuf-decoder>=0.4.0
+google-play-scraper>=1.2.7

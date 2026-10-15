@@ -1,0 +1,289 @@
+
+===== thunderFF_pb2 =====
+
+--- GetLoginDataRes ---
+  message GetLoginDataRes
+    #4 nickname  (opt 9)
+    #14 functional_addrs  (opt 9)
+    #32 informational_addrs  (opt 9)
+
+--- MajorLoginGameSecurity ---
+  message MajorLoginGameSecurity
+    #6 version  (opt 5)
+    #8 hidden_value  (opt 4)
+
+--- MajorLoginReq ---
+  message MajorLoginReq
+    #3 event_time  (opt 9)
+    #4 game_name  (opt 9)
+    #5 platform_id  (opt 5)
+    #7 client_version  (opt 9)
+    #8 system_software  (opt 9)
+    #9 system_hardware  (opt 9)
+    #10 telecom_operator  (opt 9)
+    #11 network_type  (opt 9)
+    #12 screen_width  (opt 13)
+    #13 screen_height  (opt 13)
+    #14 screen_dpi  (opt 9)
+    #15 processor_details  (opt 9)
+    #16 memory  (opt 13)
+    #17 gpu_renderer  (opt 9)
+    #18 gpu_version  (opt 9)
+    #19 unique_device_id  (opt 9)
+    #20 client_ip  (opt 9)
+    #21 language  (opt 9)
+    #22 open_id  (opt 9)
+    #23 open_id_type  (opt 9)
+    #24 device_type  (opt 9)
+    #25 memory_available  (opt MajorLoginGameSecurity)
+    #29 access_token  (opt 9)
+    #30 platform_sdk_id  (opt 5)
+    #41 network_operator_a  (opt 9)
+    #42 network_type_a  (opt 9)
+    #57 client_using_version  (opt 9)
+    #60 external_storage_total  (opt 5)
+    #61 external_storage_available  (opt 5)
+    #62 internal_storage_total  (opt 5)
+    #63 internal_storage_available  (opt 5)
+    #64 game_disk_storage_available  (opt 5)
+    #65 game_disk_storage_total  (opt 5)
+    #66 external_sdcard_avail_storage  (opt 5)
+    #67 external_sdcard_total_storage  (opt 5)
+    #73 login_by  (opt 5)
+    #74 library_path  (opt 9)
+    #76 reg_avatar  (opt 5)
+    #77 library_token  (opt 9)
+    #78 channel_type  (opt 5)
+    #79 cpu_type  (opt 5)
+    #81 cpu_architecture  (opt 9)
+    #83 client_version_code  (opt 9)
+    #86 graphics_api  (opt 9)
+    #87 supported_astc_bitset  (opt 13)
+    #88 login_open_id_type  (opt 5)
+    #89 analytics_detail  (opt 12)
+    #92 loading_time  (opt 13)
+    #93 release_channel  (opt 9)
+    #94 extra_info  (opt 9)
+    #95 android_engine_init_flag  (opt 13)
+    #97 if_push  (opt 5)
+    #98 is_vpn  (opt 5)
+    #99 origin_platform_type  (opt 9)
+    #100 primary_platform_type  (opt 9)
+
+--- MajorLoginRes ---
+  message MajorLoginRes
+    #1 account_id  (opt 4)
+    #2 region  (opt 9)
+    #8 token  (opt 9)
+    #10 url  (opt 9)
+    #21 server_time  (opt 4)
+    #22 aes_ak  (opt 12)
+    #23 iv_i  (opt 12)
+
+--- StartMatch ---
+  message StartMatch
+    #2 main  (opt StartMatch.nested1)
+    message nested1
+      #7 region_list  (rep StartMatch.nested1.nested2)
+      #12 client_version  (opt StartMatch.nested1.nested3)
+      message nested2
+        #3 region  (opt 9)
+      message nested3
+        #8 remote_version  (opt 9)
+
+===== StartMatch_pb2 =====
+
+--- StartUDPMatch ---
+  message StartUDPMatch
+    #2 main  (opt StartUDPMatch.nested1)
+    message nested1
+      #7 region_list  (rep StartUDPMatch.nested1.nested2)
+      #12 client_version  (opt StartUDPMatch.nested1.nested3)
+      message nested2
+        #3 region  (opt 9)
+      message nested3
+        #8 remote_version  (opt 9)
+
+===== xora_pb2 =====
+
+--- GetLoginDataRes ---
+  message GetLoginDataRes
+    #4 nickname  (opt 9)
+    #14 functional_addrs  (opt 9)
+    #32 informational_addrs  (opt 9)
+
+--- MajorLoginGameSecurity ---
+  message MajorLoginGameSecurity
+    #6 version  (opt 5)
+    #8 hidden_value  (opt 4)
+
+--- MajorLoginReq ---
+  message MajorLoginReq
+    #3 event_time  (opt 9)
+    #4 game_name  (opt 9)
+    #5 platform_id  (opt 5)
+    #7 client_version  (opt 9)
+    #8 system_software  (opt 9)
+    #9 system_hardware  (opt 9)
+    #10 telecom_operator  (opt 9)
+    #11 network_type  (opt 9)
+    #12 screen_width  (opt 13)
+    #13 screen_height  (opt 13)
+    #14 screen_dpi  (opt 9)
+    #15 processor_details  (opt 9)
+    #16 memory  (opt 13)
+    #17 gpu_renderer  (opt 9)
+    #18 gpu_version  (opt 9)
+    #19 unique_device_id  (opt 9)
+    #20 client_ip  (opt 9)
+    #21 language  (opt 9)
+    #22 open_id  (opt 9)
+    #23 open_id_type  (opt 9)
+    #24 device_type  (opt 9)
+    #25 memory_available  (opt MajorLoginGameSecurity)
+    #29 access_token  (opt 9)
+    #30 platform_sdk_id  (opt 5)
+    #41 network_operator_a  (opt 9)
+    #42 network_type_a  (opt 9)
+    #57 client_using_version  (opt 9)
+    #60 external_storage_total  (opt 5)
+    #61 external_storage_available  (opt 5)
+    #62 internal_storage_total  (opt 5)
+    #63 internal_storage_available  (opt 5)
+    #64 game_disk_storage_available  (opt 5)
+    #65 game_disk_storage_total  (opt 5)
+    #66 external_sdcard_avail_storage  (opt 5)
+    #67 external_sdcard_total_storage  (opt 5)
+    #73 login_by  (opt 5)
+    #74 library_path  (opt 9)
+    #76 reg_avatar  (opt 5)
+    #77 library_token  (opt 9)
+    #78 channel_type  (opt 5)
+    #79 cpu_type  (opt 5)
+    #81 cpu_architecture  (opt 9)
+    #83 client_version_code  (opt 9)
+    #86 graphics_api  (opt 9)
+    #87 supported_astc_bitset  (opt 13)
+    #88 login_open_id_type  (opt 5)
+    #89 analytics_detail  (opt 12)
+    #92 loading_time  (opt 13)
+    #93 release_channel  (opt 9)
+    #94 extra_info  (opt 9)
+    #95 android_engine_init_flag  (opt 13)
+    #97 if_push  (opt 5)
+    #98 is_vpn  (opt 5)
+    #99 origin_platform_type  (opt 9)
+    #100 primary_platform_type  (opt 9)
+
+--- MajorLoginRes ---
+  message MajorLoginRes
+    #1 account_id  (opt 4)
+    #2 region  (opt 9)
+    #8 token  (opt 9)
+    #10 url  (opt 9)
+    #21 server_time  (opt 4)
+    #22 aes_ak  (opt 12)
+    #23 iv_i  (opt 12)
+
+--- StartMatch ---
+  message StartMatch
+    #2 main  (opt StartMatch.nested1)
+    message nested1
+      #7 region_list  (rep StartMatch.nested1.nested2)
+      #12 client_version  (opt StartMatch.nested1.nested3)
+      message nested2
+        #3 region  (opt 9)
+      message nested3
+        #8 remote_version  (opt 9)
+
+===== xorateam_pb2 =====
+
+--- GetLoginDataRes ---
+  message GetLoginDataRes
+    #4 nickname  (opt 9)
+    #14 functional_addrs  (opt 9)
+    #32 informational_addrs  (opt 9)
+
+--- MajorLoginGameSecurity ---
+  message MajorLoginGameSecurity
+    #6 version  (opt 5)
+    #8 hidden_value  (opt 4)
+
+--- MajorLoginReq ---
+  message MajorLoginReq
+    #3 event_time  (opt 9)
+    #4 game_name  (opt 9)
+    #5 platform_id  (opt 5)
+    #7 client_version  (opt 9)
+    #8 system_software  (opt 9)
+    #9 system_hardware  (opt 9)
+    #10 telecom_operator  (opt 9)
+    #11 network_type  (opt 9)
+    #12 screen_width  (opt 13)
+    #13 screen_height  (opt 13)
+    #14 screen_dpi  (opt 9)
+    #15 processor_details  (opt 9)
+    #16 memory  (opt 13)
+    #17 gpu_renderer  (opt 9)
+    #18 gpu_version  (opt 9)
+    #19 unique_device_id  (opt 9)
+    #20 client_ip  (opt 9)
+    #21 language  (opt 9)
+    #22 open_id  (opt 9)
+    #23 open_id_type  (opt 9)
+    #24 device_type  (opt 9)
+    #25 memory_available  (opt MajorLoginGameSecurity)
+    #29 access_token  (opt 9)
+    #30 platform_sdk_id  (opt 5)
+    #41 network_operator_a  (opt 9)
+    #42 network_type_a  (opt 9)
+    #57 client_using_version  (opt 9)
+    #60 external_storage_total  (opt 5)
+    #61 external_storage_available  (opt 5)
+    #62 internal_storage_total  (opt 5)
+    #63 internal_storage_available  (opt 5)
+    #64 game_disk_storage_available  (opt 5)
+    #65 game_disk_storage_total  (opt 5)
+    #66 external_sdcard_avail_storage  (opt 5)
+    #67 external_sdcard_total_storage  (opt 5)
+    #73 login_by  (opt 5)
+    #74 library_path  (opt 9)
+    #76 reg_avatar  (opt 5)
+    #77 library_token  (opt 9)
+    #78 channel_type  (opt 5)
+    #79 cpu_type  (opt 5)
+    #81 cpu_architecture  (opt 9)
+    #83 client_version_code  (opt 9)
+    #86 graphics_api  (opt 9)
+    #87 supported_astc_bitset  (opt 13)
+    #88 login_open_id_type  (opt 5)
+    #89 analytics_detail  (opt 12)
+    #92 loading_time  (opt 13)
+    #93 release_channel  (opt 9)
+    #94 extra_info  (opt 9)
+    #95 android_engine_init_flag  (opt 13)
+    #97 if_push  (opt 5)
+    #98 is_vpn  (opt 5)
+    #99 origin_platform_type  (opt 9)
+    #100 primary_platform_type  (opt 9)
+
+--- MajorLoginRes ---
+  message MajorLoginRes
+    #1 account_id  (opt 4)
+    #2 region  (opt 9)
+    #8 token  (opt 9)
+    #10 url  (opt 9)
+    #21 server_time  (opt 4)
+    #22 aes_ak  (opt 12)
+    #23 iv_i  (opt 12)
+
+--- StartMatch ---
+  message StartMatch
+    #2 main  (opt StartMatch.nested1)
+    message nested1
+      #7 region_list  (rep StartMatch.nested1.nested2)
+      #12 client_version  (opt StartMatch.nested1.nested3)
+      message nested2
+        #3 region  (opt 9)
+      message nested3
+        #8 remote_version  (opt 9)

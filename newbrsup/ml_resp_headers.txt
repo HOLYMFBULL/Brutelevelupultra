@@ -1,0 +1,9 @@
+HTTP/2 100 
+
+HTTP/2 200 
+content-length: 100
+vary: Accept-Encoding
+x-ga-rv: 1
+date: Tue, 13 Oct 2026 17:53:34 GMT
+content-type: application/octet-stream
+
