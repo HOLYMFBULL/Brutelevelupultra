@@ -2606,13 +2606,16 @@ async def functional_lone_wolf(addrs, starter_packet, account_region, client_ver
                                 except Exception:
                                     pass
 
-                                # Rule 3: Stop if 3 consecutive matches give 0 EXP
-                                if exp_gain == 0:
+                                # Rule 3: Unlimited BR mode when level <= 3 or playing Battle Royale
+                                if new_lvl <= 3 or not is_lone_wolf:
+                                    _account_consecutive_zero_exp[uid_str] = 0
+                                    print_info(f"[🪂] Unlimited BR Mode Active | UID: {uid_str} (Level {new_lvl}) — script will never terminate.")
+                                elif exp_gain == 0:
                                     _account_consecutive_zero_exp[uid_str] = _account_consecutive_zero_exp.get(uid_str, 0) + 1
                                     z_cnt = _account_consecutive_zero_exp[uid_str]
-                                    print_warning(f"[!] Match gave +0 EXP ({z_cnt}/3 consecutive zero-EXP matches)")
+                                    print_warning(f"[!] Lone Wolf match gave +0 EXP ({z_cnt}/3 consecutive zero-EXP matches)")
                                     if z_cnt >= 3:
-                                        print_error(f"[🛑] Daily EXP limit reached for UID {uid_str}! (3 consecutive matches gave +0 EXP: 2 Lone Wolf & 1 BR)")
+                                        print_error(f"[🛑] Daily EXP limit reached for UID {uid_str} on Lone Wolf mode.")
                                         print_warning(f"[🛑] Stopping script for UID {uid_str} because daily EXP limit is reached.")
                                         try:
                                             bot_state.update_status(uid_str, "DAILY_LIMIT_REACHED", 0)
@@ -2623,6 +2626,7 @@ async def functional_lone_wolf(addrs, starter_packet, account_region, client_ver
                                 else:
                                     _account_consecutive_zero_exp[uid_str] = 0
                                     print_success(f"[🏆] Verified Garena EXP gain: +{exp_gain:,} EXP! Current Total: {new_exp:,} EXP (Level {new_lvl})")
+
 
                                 try:
                                     bot_state.update_status(uid_str, f"ONLINE ({mode_tag})", 0)

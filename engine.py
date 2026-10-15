@@ -423,14 +423,22 @@ class AccountWorker:
                     f"[{self.nickname}] Match #{self.matches_played} completed successfully in {mode_info['name']}."
                 )
 
-                # Rule 3: Daily EXP limit detection (3 consecutive 0 EXP matches: 2 LW and 1 BR)
-                if exp_gained == 0:
+                # Rule 3: Daily EXP limit check (Unlimited for Level <= 3 or BR mode)
+                if self.level <= 3 or "BATTLE ROYALE" in mode_info["name"]:
+                    self.consecutive_zero_exp_matches = 0
+                    self.engine.add_log(
+                        self.account_id,
+                        "INFO",
+                        "UNLIMITED_BR",
+                        f"♾️ [{self.nickname}] Unlimited BR mode active (Level {self.level}) — worker will never terminate."
+                    )
+                elif exp_gained == 0:
                     self.consecutive_zero_exp_matches += 1
                     self.engine.add_log(
                         self.account_id,
                         "WARN",
                         "ZERO_EXP_MATCH",
-                        f"⚠️ [{self.nickname}] No EXP received from match ({self.consecutive_zero_exp_matches}/3 consecutive zero-EXP matches)."
+                        f"⚠️ [{self.nickname}] No EXP received from Lone Wolf match ({self.consecutive_zero_exp_matches}/3 consecutive zero-EXP matches)."
                     )
                     if self.consecutive_zero_exp_matches >= 3:
                         self.is_running = False
@@ -439,7 +447,7 @@ class AccountWorker:
                             self.account_id,
                             "WARN",
                             "DAILY_LIMIT_STOPPED",
-                            f"🛑 [{self.nickname}] Daily EXP limit reached! 3 consecutive matches gave +0 EXP (2 Lone Wolf & 1 BR). Worker automatically stopped to prevent wasted matchmaking cycles."
+                            f"🛑 [{self.nickname}] Daily EXP limit reached on Lone Wolf mode. Worker paused."
                         )
                         self.sync_to_database()
                         return
@@ -447,6 +455,8 @@ class AccountWorker:
                     self.consecutive_zero_exp_matches = 0
 
                 self.status = "IDLE"
+
+
                 self.sync_to_database()
 
                 # Rule 4: Clean cooldown before sequential start of next match

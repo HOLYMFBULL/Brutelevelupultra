@@ -58,8 +58,24 @@ def index():
     try:
         return render_template("index.html")
     except Exception as e:
-        logger.error(f"Template rendering failed: {e}")
-        return jsonify(engine.get_stats())
+        logger.warning(f"Jinja template lookup notice: {e}, using direct HTML file fallback...")
+
+    candidate_paths = [
+        os.path.join(BASE_DIR, "templates", "index.html"),
+        os.path.join(BASE_DIR, "index.html"),
+        os.path.join(BASE_DIR, "freefire-railway-unified", "templates", "index.html"),
+        os.path.join(BASE_DIR, "newbrsup", "templates", "index.html")
+    ]
+    for path in candidate_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return Response(f.read(), mimetype="text/html")
+            except Exception:
+                pass
+
+    return jsonify(engine.get_stats())
+
 
 @app.route("/health")
 def health():
