@@ -23,16 +23,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger("FF-Railway-Server")
 
-# Initialize Flask App
-app = Flask(__name__, template_folder="templates", static_folder="static")
+# Base directory of the project
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Initialize Flask App with absolute template folder
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static")
+)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "ff-secret-railway-key-2026")
 
-# Global engine instance
+# Global engine instance with absolute file paths
 engine = FFMatchmakingEngine(
-    accounts_file="accounts.json",
-    devices_file="devices.json",
-    users_file="users.json",
-    cache_file="token_cache.json"
+    accounts_file=os.path.join(BASE_DIR, "accounts.json"),
+    devices_file=os.path.join(BASE_DIR, "devices.json"),
+    users_file=os.path.join(BASE_DIR, "users.json"),
+    cache_file=os.path.join(BASE_DIR, "token_cache.json")
 )
 
 # Background worker thread controller
@@ -53,7 +60,18 @@ def background_worker():
 
 @app.route("/")
 def index():
-    """Serve the web dashboard"""
+    """Serve the interactive web dashboard interface"""
+    if request.headers.get("Accept") == "application/json" or request.args.get("format") == "json":
+        return api_info()
+    try:
+        return render_template("index.html")
+    except Exception as e:
+        logger.warning(f"Could not render template: {e}")
+        return api_info()
+
+@app.route("/api/info")
+def api_info():
+    """Serve the raw JSON system metadata"""
     return jsonify({
         "status": "online",
         "service": "Railway FreeFire Matchmaking Studio",

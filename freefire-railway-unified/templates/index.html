@@ -2,34 +2,381 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Free Fire Matchmaking Bot Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Fire Matchmaking Studio · Railway</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
-    .card { background: #1e293b; border-radius: 8px; padding: 1.5rem; max-width: 600px; margin: 0 auto; border: 1px solid #334155; }
-    h1 { color: #38bdf8; font-size: 1.3rem; }
-    button { background: #0284c7; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 500; }
-    button:hover { background: #0369a1; }
-    pre { background: #090d16; padding: 1rem; border-radius: 6px; overflow-x: auto; color: #94a3b8; font-size: 0.85rem; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
   </style>
 </head>
-<body>
-  <div class="card">
-    <h1>Railway Free Fire Bot Dashboard</h1>
-    <p>Engine status: <strong style="color:#34d399">ONLINE</strong></p>
-    <button onclick="fetch('/api/match/start', {method:'POST'}).then(r=>r.json()).then(d=>alert('Queued: '+JSON.stringify(d)))">Trigger Match</button>
-    <button onclick="fetch('/api/match/cancel', {method:'POST'}).then(r=>r.json()).then(d=>alert('Cancelled'))" style="background:#dc2626">Cancel Match</button>
-    <h3>Live Engine Telemetry (/api/status)</h3>
-    <pre id="telemetry">Loading...</pre>
-  </div>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 font-bold font-mono">
+        FF
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white tracking-tight leading-none">Free Fire Matchmaking Studio</h1>
+        <p class="text-xs text-slate-400 mt-1 font-mono">Railway Node · Port <span id="hdr-port" class="text-sky-400">8080</span> · Gateway UDP 7006</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-300 font-medium">Worker: <span id="hdr-worker" class="text-emerald-400 font-semibold">Active</span></span>
+      </div>
+      <button onclick="toggleEngine()" id="btn-toggle-engine" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer">
+        Restart Worker
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- Top Status Strip -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-1">
+        <div class="text-xs font-medium text-slate-400">Engine State</div>
+        <div id="stat-state" class="text-xl font-bold font-mono text-emerald-400">IDLE</div>
+        <div class="text-[11px] text-slate-500 font-mono">Socket: UDP 0.0.0.0</div>
+      </div>
+      <div class="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-1">
+        <div class="text-xs font-medium text-slate-400">Active Bot Accounts</div>
+        <div id="stat-accounts" class="text-xl font-bold font-mono text-sky-400">3 Loaded</div>
+        <div class="text-[11px] text-slate-500 font-mono">accounts.json</div>
+      </div>
+      <div class="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-1">
+        <div class="text-xs font-medium text-slate-400">Device Hardware Profiles</div>
+        <div id="stat-devices" class="text-xl font-bold font-mono text-amber-400">3 Spoofed</div>
+        <div class="text-[11px] text-slate-500 font-mono">devices.json</div>
+      </div>
+      <div class="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-1">
+        <div class="text-xs font-medium text-slate-400">Active Match Ticket</div>
+        <div id="stat-ticket" class="text-base font-bold font-mono text-slate-300 truncate">None (Idle)</div>
+        <div class="text-[11px] text-slate-500 font-mono">Opcode 0x00C8</div>
+      </div>
+    </div>
+
+    <!-- Matchmaking Command Center -->
+    <div class="p-5 bg-slate-900/80 border border-slate-800 rounded-xl space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Matchmaking Packet Controls</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Dispatches Protobuf binary frames to Free Fire Matchmaker Gateway (Opcode 0x00C8)</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="startMatch()" id="btn-start-match" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-950">
+            Queue Match (StartMatchReq)
+          </button>
+          <button onclick="cancelMatch()" id="btn-cancel-match" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-rose-950">
+            Cancel Match (0x00CA)
+          </button>
+          <button onclick="sendHeartbeat()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium transition cursor-pointer">
+            Send Ping (0x0005)
+          </button>
+        </div>
+      </div>
+
+      <!-- Config Row -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-800/80 text-xs">
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Mode</label>
+          <select id="sel-mode" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 font-medium">
+            <option value="2">2 · Battle Royale Ranked</option>
+            <option value="1">1 · Battle Royale Classic</option>
+            <option value="3">3 · Clash Squad Ranked</option>
+            <option value="4">4 · Lone Wolf 1v1</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Squad Formation</label>
+          <select id="sel-team" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 font-medium">
+            <option value="1">1 · Solo</option>
+            <option value="2">2 · Duo</option>
+            <option value="4">4 · Squad</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-slate-400 font-medium mb-1">Region Cluster</label>
+          <select id="sel-region" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 font-medium">
+            <option value="IND">IND · India</option>
+            <option value="BR">BR · Brazil</option>
+            <option value="NA">NA · North America</option>
+            <option value="SG">SG · Singapore</option>
+            <option value="EU">EU · Europe</option>
+            <option value="ME">ME · Middle East</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex items-center gap-2 border-b border-slate-800 text-xs font-semibold">
+      <button onclick="switchTab('logs')" id="tab-btn-logs" class="px-4 py-2 text-sky-400 border-b-2 border-sky-400 cursor-pointer">
+        Protocol Logs & Events
+      </button>
+      <button onclick="switchTab('accounts')" id="tab-btn-accounts" class="px-4 py-2 text-slate-400 hover:text-white cursor-pointer">
+        Bot Accounts
+      </button>
+      <button onclick="switchTab('devices')" id="tab-btn-devices" class="px-4 py-2 text-slate-400 hover:text-white cursor-pointer">
+        Hardware Devices
+      </button>
+      <button onclick="switchTab('api')" id="tab-btn-api" class="px-4 py-2 text-slate-400 hover:text-white cursor-pointer">
+        API Endpoints & Health
+      </button>
+    </div>
+
+    <!-- Tab 1: Protocol Logs -->
+    <div id="tab-logs" class="space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Socket Logs</span>
+        <button onclick="loadLogs()" class="text-xs text-slate-500 hover:text-slate-300 cursor-pointer">Refresh Logs</button>
+      </div>
+      <div id="logs-container" class="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs space-y-2 h-96 overflow-y-auto">
+        <div class="text-slate-500 italic">Connecting to engine logs...</div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Accounts -->
+    <div id="tab-accounts" class="hidden space-y-3">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Loaded Bot Credentials (accounts.json)</div>
+      <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950 text-slate-400 text-[11px] font-mono border-b border-slate-800">
+            <tr>
+              <th class="px-4 py-2.5">UID</th>
+              <th class="px-4 py-2.5">Nickname</th>
+              <th class="px-4 py-2.5">Region</th>
+              <th class="px-4 py-2.5">Level</th>
+              <th class="px-4 py-2.5">Rank</th>
+              <th class="px-4 py-2.5">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-accounts" class="divide-y divide-slate-800/60 font-mono">
+            <tr><td colspan="6" class="px-4 py-3 text-slate-500">Loading accounts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: Devices -->
+    <div id="tab-devices" class="hidden space-y-3">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Emulated Android Profiles (devices.json)</div>
+      <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950 text-slate-400 text-[11px] font-mono border-b border-slate-800">
+            <tr>
+              <th class="px-4 py-2.5">Device Model</th>
+              <th class="px-4 py-2.5">Android ID</th>
+              <th class="px-4 py-2.5">IMEI</th>
+              <th class="px-4 py-2.5">MAC Address</th>
+              <th class="px-4 py-2.5">OS Version</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-devices" class="divide-y divide-slate-800/60 font-mono">
+            <tr><td colspan="5" class="px-4 py-3 text-slate-500">Loading devices...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 4: API Endpoints -->
+    <div id="tab-api" class="hidden space-y-4">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Server Health & JSON Status</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-2">
+          <div class="text-xs font-bold text-sky-400 font-mono">GET /health</div>
+          <pre id="pre-health" class="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto">Loading...</pre>
+        </div>
+        <div class="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-2">
+          <div class="text-xs font-bold text-emerald-400 font-mono">GET /api/status</div>
+          <pre id="pre-status" class="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto">Loading...</pre>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="border-t border-slate-900 bg-slate-950 px-6 py-4 text-center text-xs text-slate-500">
+    Free Fire Matchmaking Studio · Railway Edition
+  </footer>
+
   <script>
-    async function update() {
+    let activeTabId = 'logs';
+
+    function switchTab(tabId) {
+      activeTabId = tabId;
+      ['logs', 'accounts', 'devices', 'api'].forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        const btn = document.getElementById('tab-btn-' + t);
+        if (t === tabId) {
+          el.classList.remove('hidden');
+          btn.className = 'px-4 py-2 text-sky-400 border-b-2 border-sky-400 cursor-pointer';
+        } else {
+          el.classList.add('hidden');
+          btn.className = 'px-4 py-2 text-slate-400 hover:text-white cursor-pointer';
+        }
+      });
+      if (tabId === 'accounts') loadAccounts();
+      if (tabId === 'devices') loadDevices();
+      if (tabId === 'api') loadApiDebug();
+    }
+
+    async function loadStatus() {
       try {
         const res = await fetch('/api/status');
-        document.getElementById('telemetry').innerText = JSON.stringify(await res.json(), null, 2);
-      } catch(e) {}
+        const data = await res.json();
+        
+        document.getElementById('stat-state').innerText = data.engine_state || 'IDLE';
+        if (data.engine_state === 'QUEUED') {
+          document.getElementById('stat-state').className = 'text-xl font-bold font-mono text-amber-400';
+        } else if (data.engine_state === 'IN_MATCH') {
+          document.getElementById('stat-state').className = 'text-xl font-bold font-mono text-emerald-400';
+        } else {
+          document.getElementById('stat-state').className = 'text-xl font-bold font-mono text-slate-400';
+        }
+
+        document.getElementById('stat-accounts').innerText = (data.total_accounts || 0) + ' Loaded';
+        document.getElementById('stat-ticket').innerText = data.match_ticket || 'None (Idle)';
+        if (data.active_device) {
+          document.getElementById('stat-devices').innerText = data.active_device.device_name || 'Configured';
+        }
+      } catch (err) {
+        console.error('Error fetching status:', err);
+      }
     }
-    update();
-    setInterval(update, 3000);
+
+    async function loadLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const logs = await res.json();
+        const container = document.getElementById('logs-container');
+        
+        if (!logs || logs.length === 0) {
+          container.innerHTML = '<div class="text-slate-600 italic">No packet logs yet. Trigger a match to start.</div>';
+          return;
+        }
+
+        container.innerHTML = logs.map(l => {
+          let color = 'text-sky-400';
+          if (l.level === 'SUCCESS') color = 'text-emerald-400';
+          if (l.level === 'WARN') color = 'text-amber-400';
+          if (l.level === 'ERROR') color = 'text-rose-400';
+
+          return `
+            <div class="border-b border-slate-900 pb-2 space-y-0.5">
+              <div class="flex items-center justify-between text-[11px] text-slate-500">
+                <span>${l.timestamp}</span>
+                <span class="font-bold ${color}">[${l.action}]</span>
+              </div>
+              <div class="text-slate-200">${l.details}</div>
+              ${l.raw_hex ? `<div class="text-[10px] text-slate-500 bg-slate-900/60 p-1 rounded truncate select-all">HEX: ${l.raw_hex}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Error loading logs:', err);
+      }
+    }
+
+    async function loadAccounts() {
+      try {
+        const res = await fetch('/api/accounts');
+        const data = await res.json();
+        const tbody = document.getElementById('tbl-accounts');
+        tbody.innerHTML = data.map(a => `
+          <tr class="hover:bg-slate-900/50">
+            <td class="px-4 py-2.5 text-sky-400 font-bold">${a.account_id}</td>
+            <td class="px-4 py-2.5 text-slate-200">${a.nickname}</td>
+            <td class="px-4 py-2.5 text-slate-400">${a.region}</td>
+            <td class="px-4 py-2.5 text-slate-200">${a.level || 50}</td>
+            <td class="px-4 py-2.5 text-amber-400">${a.rank || 'Grandmaster'}</td>
+            <td class="px-4 py-2.5 text-emerald-400">${a.status || 'active'}</td>
+          </tr>
+        `).join('');
+      } catch (err) {}
+    }
+
+    async function loadDevices() {
+      try {
+        const res = await fetch('/api/devices');
+        const data = await res.json();
+        const tbody = document.getElementById('tbl-devices');
+        tbody.innerHTML = data.map(d => `
+          <tr class="hover:bg-slate-900/50">
+            <td class="px-4 py-2.5 text-emerald-400 font-bold">${d.device_name}</td>
+            <td class="px-4 py-2.5 text-sky-300 truncate max-w-xs">${d.android_id}</td>
+            <td class="px-4 py-2.5 text-slate-300">${d.imei}</td>
+            <td class="px-4 py-2.5 text-slate-400">${d.mac}</td>
+            <td class="px-4 py-2.5 text-slate-400">${d.os_version}</td>
+          </tr>
+        `).join('');
+      } catch (err) {}
+    }
+
+    async function loadApiDebug() {
+      try {
+        const hRes = await fetch('/health');
+        document.getElementById('pre-health').innerText = JSON.stringify(await hRes.json(), null, 2);
+        const sRes = await fetch('/api/status');
+        document.getElementById('pre-status').innerText = JSON.stringify(await sRes.json(), null, 2);
+      } catch (err) {}
+    }
+
+    async function startMatch() {
+      const mode = Number(document.getElementById('sel-mode').value);
+      const team_type = Number(document.getElementById('sel-team').value);
+      const region = document.getElementById('sel-region').value;
+
+      await fetch('/api/match/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, team_type, region })
+      });
+      loadStatus();
+      loadLogs();
+    }
+
+    async function cancelMatch() {
+      await fetch('/api/match/cancel', { method: 'POST' });
+      loadStatus();
+      loadLogs();
+    }
+
+    async function sendHeartbeat() {
+      await fetch('/api/match/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'heartbeat' })
+      });
+      loadLogs();
+    }
+
+    async function toggleEngine() {
+      await fetch('/api/engine/start', { method: 'POST' });
+      loadStatus();
+      loadLogs();
+    }
+
+    // Initial load & periodic tick
+    loadStatus();
+    loadLogs();
+    setInterval(() => {
+      loadStatus();
+      if (activeTabId === 'logs') loadLogs();
+    }, 2500);
   </script>
 </body>
 </html>
